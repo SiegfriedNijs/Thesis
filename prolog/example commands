@@ -1,0 +1,68 @@
+%%TOOLS ANTWOORDEN
+[current(wanted_action(human(1)))~=(AT,F,left_gripper)]
+[current(wants_tool_used(human(1)))~=left_gripper]
+[current(wants_tool_used(human(1)))~=right_gripper]
+[current(wants_tool_used(human(1)))~=robotbrain]
+
+(pickup, object(ID), Gripper   )
+(place , object(ID), Gripper   )
+(info  , object(ID), robotbrain)
+
+%%OBJ ANTWOORDEN
+[has_colour(object(ID),red),current(wanted_action(human(1)))~=(AT,object(ID),T)]
+[has_colour(object(ID),midnight_blue),current(wanted_action(human(1)))~=(AT,object(ID),T)]
+
+"can with right gripper"
+[current(wanted_action(human(1)))~=(AT,F,right_gripper),current(has_category(can,F))~=true]
+"can with left gripper"
+[current(wanted_action(human(1)))~=(AT,F,left_gripper),current(has_category(can,F))~=true]
+
+[has_colour(object(ID),red),current(has_category(can,object(ID)))~=true,current(wanted_action(human(1)))~=(AT,object(ID),T)]
+[has_colour(object(ID),midnight_blue),current(has_category(can,object(ID)))~=true]
+[has_colour(object(ID),midnight_blue)]
+[has_colour(object(ID),red)]
+
+"left object"
+[current(wanted_action(human(1)))~=(AT,F,Gr),current(leftOf(F,O))~=true]
+
+"cup"
+[current(has_category(cup,F))~=true]
+
+"can"
+[current(has_category(can,F))~=true]
+
+!!!niet zelfde als
+[current(wants_object(can,human(1)))~=true] %zowel human info als connectie met wa
+[current(care(human(1),object))~=nocare]
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+nobjs:t~=distribution(uniform([4]))
+seen(object(1)):t~=distribution(uniform([true]))
+seen(object(2)):t~=distribution(uniform([false]))
+seen(object(3)):t~=distribution(uniform([false]))
+seen(object(4)):t~=distribution(uniform([false]))
+holds_fluid(object(1)):t~=distribution(uniform([cola_ca]))
+obj_category(object(4)):t~=distribution(uniform([none]))
+obj_category(object(3)):t~=distribution(uniform([none]))
+obj_category(object(2)):t~=distribution(uniform([none]))
+obj_category(object(1)):t~=distribution(uniform([cup]))
+has_need(human(1)):t~=distribution(uniform([obtain_item(moveablethings_ca)]))
+care(human(1),type):t~=distribution(uniform([care]))
+care(human(1),object):t~=distribution(uniform([care]))
+care(human(1),tool):t~=distribution(uniform([nocare]))
+wanted_action(human(1)):t~=distribution(uniform([(pickup,object(1),right_gripper)]))
+holding_object(right_gripper):t~=distribution(uniform([none]))
+holding_object(left_gripper):t~=distribution(uniform([none]))
+has_position(object(4)):t~=distribution(finite([1: (-1000,-1000,-1000)]))
+has_position(object(3)):t~=distribution(finite([1: (-1000,-1000,-1000)]))
+has_position(object(2)):t~=distribution(finite([1: (-1000,-1000,-1000)]))
+has_position(object(1)):t~=distribution(finite([1: (0.486119509,-0.00237884745,0.549472451)]))
+has_position(table):t~=distribution(finite([1: (0.702449799,0.0959949195,0.4035106)]))
+has_dimensions(object(4)):t~=distribution(uniform([[0.1,0.1,0.1]]))
+has_dimensions(object(3)):t~=distribution(uniform([[0.1,0.1,0.1]]))
+has_dimensions(object(2)):t~=distribution(uniform([[0.1,0.1,0.1]]))
+has_dimensions(object(1)):t~=distribution(uniform([[0.0191877484,0.0611744151,0.113761216]]))
+has_dimensions(table):t~=distribution(finite([1:[0.5901857763833154,1.39343932502139,0.2]]))
+
+

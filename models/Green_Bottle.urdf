@@ -1,0 +1,24 @@
+<robot name="Green_Bottle">
+       <link name="body">
+       	     <visual>
+		<geometry>
+			<mesh filename="package://pr2_pick_and_place_scenario/models/meshes/Green_Bottle.dae" scale="1 1 1" />
+		</geometry>
+		<origin rpy="0 0 0" xyz="0 0 0" />
+	     </visual>
+       	     <collision>
+		<geometry>
+			<mesh filename="package://pr2_pick_and_place_scenario/models/meshes/Green_Bottle.dae" scale="1 1 1" />
+		</geometry>
+		<origin rpy="0 0 0" xyz="0 0 0" />
+	     </collision>
+	     <inertial>
+		<mass value="0.5" />
+		<inertia ixx="1.0" ixy="0.0" ixz="0.0" iyy="1.0" iyz="0.0" izz="1.0" />
+	     </inertial>
+       </link>
+	<gazebo reference="Green_Bottle">
+	<material>Gazebo/Green</material>
+    <turnGravityOff>false</turnGravityOff>
+  </gazebo>
+</robot>
