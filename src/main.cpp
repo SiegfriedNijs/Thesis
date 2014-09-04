@@ -6,7 +6,7 @@
 #include <actionlib/client/simple_action_client.h>
 #include <tabletop_object_detector/TabletopDetection.h>
 #include <tabletop_collision_map_processing/TabletopCollisionMapProcessing.h>
-
+#include <arm_navigation_msgs/SetPlanningSceneDiff.h>
 
 #include <limits>
 #include <household_objects_database_msgs/GetModelDescription.h>
@@ -27,6 +27,7 @@
 
 #include <kinematics_msgs/GetKinematicSolverInfo.h>
 #include <kinematics_msgs/GetPositionFK.h>
+#include <kinematics_msgs/GetPositionIK.h>
 #include <pcl/common/common.h>
 
 #include <object_manipulator/tools/mechanism_interface.h>
@@ -60,7 +61,6 @@ typedef actionlib::SimpleActionClient<pr2_controllers_msgs::PointHeadAction> Poi
 typedef actionlib::SimpleActionClient<
 		pr2_controllers_msgs::Pr2GripperCommandAction> GripperClient;
 using namespace std;
-
 
 void sendQuery(string query) {
 	cout << query << endl;
@@ -416,6 +416,7 @@ public:
 
 		 get_state_client_.call(req,res);
 		 */
+
 
 		actionlib::SimpleActionClient<arm_navigation_msgs::MoveArmAction> move_arm2(
 				"move_left_arm", true);
@@ -2042,13 +2043,13 @@ bool perform_action(string action, string param[],
 					"base_link");
 			right.setPickupLocation(start_pose2);
 			right.setOrientation(start_pose2);
-			right.moveSideStandard(nh);
-			/*
+			//right.moveSideStandard(nh);
+
 			right.moveSide(nh, start_pose2.pose.orientation.x,
 					start_pose2.pose.orientation.y,
 					start_pose2.pose.orientation.z,
 					start_pose2.pose.orientation.w);
-			*/
+
 		}
 		if (param[4] == "left_gripper") {
 			left.pickup(processing_call, index_go, nh);
@@ -2056,13 +2057,13 @@ bool perform_action(string action, string param[],
 					"base_link");
 			left.setPickupLocation(start_pose2);
 			left.setOrientation(start_pose2);
-			left.moveSideStandard(nh);
-			/*
+			//left.moveSideStandard(nh);
+
 			left.moveSide(nh, start_pose2.pose.orientation.x,
 					start_pose2.pose.orientation.y,
 					start_pose2.pose.orientation.z,
 					start_pose2.pose.orientation.w);
-			*/
+
 
 		}
 	}
@@ -2123,23 +2124,59 @@ bool perform_action(string action, string param[],
 	success = true; //TODO
 	return success;
 }
-
 int main(int argc, char **argv) {
-	ros::init(argc, argv, "pick_and_place_app");
-	ros::NodeHandle nh("~");
+	ros::init(argc, argv, "get_ik");
+	ros::NodeHandle nh;
+
+	/*
+	geometry_msgs::PoseStamped pose;
+
+			ros::ServiceClient get_state_client_ = nh.serviceClient<
+					arm_navigation_msgs::GetRobotState>(
+					"/environment_server/get_robot_state");
+			arm_navigation_msgs::GetRobotState::Request req;
+			arm_navigation_msgs::GetRobotState::Response res;
+			get_state_client_.call(req, res);
+			std::cout << res.error_code << std::endl;
+
+			ros::service::waitForService("pr2_left_arm_kinematics/get_fk");
+			ros::ServiceClient fk_client = nh.serviceClient<
+					kinematics_msgs::GetPositionFK>(
+					"pr2_left_arm_kinematics/get_fk");
+
+			kinematics_msgs::GetPositionFK::Request fk_request;
+			kinematics_msgs::GetPositionFK::Response fk_response;
+
+			fk_request.header.frame_id = "base_link";
+			fk_request.fk_link_names.resize(1);
+			fk_request.fk_link_names[0] = "l_wrist_roll_link";
+			fk_request.robot_state = res.robot_state;
+			if (fk_client.call(fk_request, fk_response)) {
+				std::cout << fk_response.fk_link_names[0] << std::endl;
+				std::cout << fk_response.pose_stamped[0].header.frame_id
+						<< std::endl;
+				pose = fk_response.pose_stamped[0];
+				std::cout << "Wrist pose currently:" << std::endl;
+						std::cout << pose.pose.position.x << std::endl;
+						std::cout << pose.pose.position.y << std::endl;
+						std::cout << pose.pose.position.z << std::endl;
+						std::cout << pose.pose.orientation.x << std::endl;
+						std::cout << pose.pose.orientation.y << std::endl;
+						std::cout << pose.pose.orientation.z << std::endl;
+						std::cout << pose.pose.orientation.w << std::endl;
+
+			} else {
+				//std::cout << "can't get link info" << std::endl;
+			}
+*/
 
 	int n_particles = 1000;
-	//nh.getParam("np", n_particles);
-	//ROS_INFO("n_particles %d", n_particles);
 
 	if (YAP_FastInit(NULL) == YAP_BOOT_ERROR)
 		return 1;
 
 	dcpf(n_particles);
-	//dcpf(particles);
-
 	particles = n_particles;
-
 	ros::ServiceClient object_detection_srv;
 	ros::ServiceClient collision_processing_srv;
 
