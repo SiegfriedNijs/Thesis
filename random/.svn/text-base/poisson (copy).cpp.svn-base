@@ -1,0 +1,84 @@
+#include "Yap/YapInterface.h"
+#include <unistd.h>
+
+#include <iostream>
+#include <fstream>
+
+
+#include <math.h> 
+
+#include "rng.h"
+
+// static int sample(int lambda) {
+//   int n = 0;
+//   double probOfN = exp(-lambda); // start with prob of 0
+//   double cumProb = probOfN;
+  
+//   double u = (1.0*rand()) / RAND_MAX;
+//   while (cumProb < u) {
+//     n++;
+//     // ratio between P(n) and P(n-1) is lambda / n
+//     probOfN *= (lambda / n);
+//     cumProb += probOfN;
+//   }
+//   return n;
+// }
+
+
+static int pl_normal(void) 
+{
+  float mean;
+
+  if(YAP_IsIntTerm(YAP_ARG1)){
+    mean = YAP_IntOfTerm(YAP_ARG1);
+  }else  if(YAP_IsFloatTerm(YAP_ARG1)){
+    mean = YAP_FloatOfTerm(YAP_ARG1);
+  }else{
+    return false;
+  }
+
+  float variance;
+  if(YAP_IsIntTerm(YAP_ARG2)){
+    variance = YAP_IntOfTerm(YAP_ARG2);
+  }else  if(YAP_IsFloatTerm(YAP_ARG2)){
+    variance = YAP_FloatOfTerm(YAP_ARG2);
+  }else{
+    return false;
+  }
+  RNG x; 
+  float rnd= x.normal(mean,variance);
+  YAP_Term out = YAP_ARG3;
+
+  YAP_Term val= YAP_MkFloatTerm(rnd);
+  return(YAP_Unify(out,val));
+}
+ 
+
+static int pl_poisson(void) 
+{
+  float lambda;
+
+  if(YAP_IsIntTerm(YAP_ARG1)){
+    lambda = YAP_IntOfTerm(YAP_ARG1);
+  }else  if(YAP_IsFloatTerm(YAP_ARG1)){
+    lambda = YAP_FloatOfTerm(YAP_ARG1);
+  }else{
+    return false;
+  }
+  RNG x; 
+  int rnd= x.poisson(lambda);
+  YAP_Term out = YAP_ARG2;
+
+  YAP_Term val= YAP_MkIntTerm(rnd);
+  return(YAP_Unify(out,val));
+}
+
+
+extern "C"{
+  void init_my_predicates()
+  {
+    YAP_UserCPredicate("poisson",pl_poisson,2);
+    YAP_UserCPredicate("normal",pl_normal,3);
+
+  }
+}

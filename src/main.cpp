@@ -6,7 +6,7 @@
 #include <actionlib/client/simple_action_client.h>
 #include <tabletop_object_detector/TabletopDetection.h>
 #include <tabletop_collision_map_processing/TabletopCollisionMapProcessing.h>
-#include <arm_navigation_msgs/SetPlanningSceneDiff.h>
+
 
 #include <limits>
 #include <household_objects_database_msgs/GetModelDescription.h>
@@ -27,7 +27,6 @@
 
 #include <kinematics_msgs/GetKinematicSolverInfo.h>
 #include <kinematics_msgs/GetPositionFK.h>
-#include <kinematics_msgs/GetPositionIK.h>
 #include <pcl/common/common.h>
 
 #include <object_manipulator/tools/mechanism_interface.h>
@@ -62,15 +61,11 @@ typedef actionlib::SimpleActionClient<
 		pr2_controllers_msgs::Pr2GripperCommandAction> GripperClient;
 using namespace std;
 
+
 void sendQuery(string query) {
-	cout << query << endl;
 	YAP_Term error;
 	const char *q2 = query.c_str();
-	int res = YAP_RunGoal(YAP_ReadBuffer(q2, &error));
-	if (res == 1)
-			ROS_INFO("OK: query ok");
-		else
-			ROS_INFO("Error: query failed");
+	YAP_RunGoalOnce(YAP_ReadBuffer(q2, &error));
 }
 
 class LeftGripper {
@@ -263,11 +258,10 @@ public:
 		gripper_orientation.setW(w);
 		gripper_orientation.normalize();
 
-		std::cout << "set orientation left" << std::endl;
-		std::cout << gripper_orientation.getX() << std::endl;
-		std::cout << gripper_orientation.getY() << std::endl;
-		std::cout << gripper_orientation.getZ() << std::endl;
-		std::cout << gripper_orientation.getW() << std::endl;
+		//std::cout << gripper_orientation.getX() << std::endl;
+		//std::cout << gripper_orientation.getY() << std::endl;
+		//std::cout << gripper_orientation.getZ() << std::endl;
+		//std::cout << gripper_orientation.getW() << std::endl;
 
 		double x2 = gripper_orientation.getX();
 		double y2 = gripper_orientation.getY();
@@ -279,13 +273,13 @@ public:
 	}
 
 	void moveSide(ros::NodeHandle nh, double x, double y, double z, double w) {
-		ROS_INFO("Moving left arm to the side");
+
 		std::cout << x << std::endl;
 						std::cout << y << std::endl;
 						std::cout << z << std::endl;
 						std::cout << w << std::endl;
 
-
+		ROS_INFO("Moving left arm to the side");
 		ros::ServiceClient get_state_client_ = nh.serviceClient<
 				arm_navigation_msgs::GetRobotState>(
 				"/environment_server/get_robot_state");
@@ -417,7 +411,6 @@ public:
 		 get_state_client_.call(req,res);
 		 */
 
-
 		actionlib::SimpleActionClient<arm_navigation_msgs::MoveArmAction> move_arm2(
 				"move_left_arm", true);
 		move_arm2.waitForServer(ros::Duration(15.0));
@@ -488,8 +481,7 @@ public:
 					qloc += "],";
 					qloc += boost::lexical_cast<std::string>(particles);
 					qloc += ")";
-
-					//cout << qloc << endl;
+					cout << qloc << endl;
 					sendQuery(qloc);
 				}
 
@@ -505,17 +497,12 @@ public:
 	geometry_msgs::PoseStamped getPosition(ros::NodeHandle nh,
 			std::string frame) {
 		geometry_msgs::PoseStamped pose;
-
-		std::cout << "get position procedure" << std::endl;
-				std::cout << frame << std::endl;
-
 		ros::ServiceClient get_state_client_ = nh.serviceClient<
 				arm_navigation_msgs::GetRobotState>(
 				"/environment_server/get_robot_state");
 		arm_navigation_msgs::GetRobotState::Request req;
 		arm_navigation_msgs::GetRobotState::Response res;
 		get_state_client_.call(req, res);
-		std::cout << res.error_code << std::endl;
 
 		ros::service::waitForService("pr2_left_arm_kinematics/get_fk");
 		ros::ServiceClient fk_client = nh.serviceClient<
@@ -543,8 +530,8 @@ public:
 	}
 
 	void printPose(geometry_msgs::PoseStamped pose) {
-
-		std::cout << "Wrist pose left currently:" << std::endl;
+		/*
+		std::cout << "Wrist pose currently:" << std::endl;
 		std::cout << pose.pose.position.x << std::endl;
 		std::cout << pose.pose.position.y << std::endl;
 		std::cout << pose.pose.position.z << std::endl;
@@ -552,7 +539,7 @@ public:
 		std::cout << pose.pose.orientation.y << std::endl;
 		std::cout << pose.pose.orientation.z << std::endl;
 		std::cout << pose.pose.orientation.w << std::endl;
-
+	*/
 		}
 
 	void place(
@@ -811,11 +798,12 @@ public:
 		tfScalar w = start_pose.pose.orientation.w;
 		gripper_orientation.setW(w);
 		gripper_orientation.normalize();
-		std::cout << "set orientation right" << std::endl;
-				std::cout << gripper_orientation.getX() << std::endl;
-				std::cout << gripper_orientation.getY() << std::endl;
-				std::cout << gripper_orientation.getZ() << std::endl;
-				std::cout << gripper_orientation.getW() << std::endl;
+/*
+		std::cout << gripper_orientation.getX() << std::endl;
+		std::cout << gripper_orientation.getY() << std::endl;
+		std::cout << gripper_orientation.getZ() << std::endl;
+		std::cout << gripper_orientation.getW() << std::endl;
+*/
 		double x2 = gripper_orientation.getX();
 		double y2 = gripper_orientation.getY();
 		double z2 = gripper_orientation.getZ();
@@ -827,13 +815,13 @@ public:
 	}
 
 	void moveSide(ros::NodeHandle nh, double x, double y, double z, double w) {
-		ROS_INFO("Moving right arm to the side");
+
 		std::cout << x << std::endl;
 						std::cout << y << std::endl;
 						std::cout << z << std::endl;
 						std::cout << w << std::endl;
 
-
+		ROS_INFO("Moving right arm to the side");
 		ros::ServiceClient get_state_client_ = nh.serviceClient<
 				arm_navigation_msgs::GetRobotState>(
 				"/environment_server/get_robot_state");
@@ -924,8 +912,7 @@ public:
 							qloc += "],";
 							qloc += boost::lexical_cast<std::string>(particles);
 							qloc += ")";
-
-							//cout << qloc << endl;
+							cout << qloc << endl;
 							sendQuery(qloc);
 		toSide = true;
 	}
@@ -1021,8 +1008,7 @@ public:
 					qloc += "],";
 					qloc += boost::lexical_cast<std::string>(particles);
 					qloc += ")";
-
-					//cout << qloc << endl;
+					cout << qloc << endl;
 					sendQuery(qloc);
 					ROS_INFO("Action finished: %s", state2.toString().c_str());
 				}
@@ -1036,8 +1022,8 @@ public:
 	}
 
 	void printPose(geometry_msgs::PoseStamped pose) {
-
-		std::cout << "Wrist pose right currently:" << std::endl;
+		/*
+		std::cout << "Wrist pose currently:" << std::endl;
 		std::cout << pose.pose.position.x << std::endl;
 		std::cout << pose.pose.position.y << std::endl;
 		std::cout << pose.pose.position.z << std::endl;
@@ -1045,7 +1031,7 @@ public:
 		std::cout << pose.pose.orientation.y << std::endl;
 		std::cout << pose.pose.orientation.z << std::endl;
 		std::cout << pose.pose.orientation.w << std::endl;
-
+		*/
 	}
 
 	void place(
@@ -1237,9 +1223,6 @@ public:
 
 	geometry_msgs::PoseStamped getPosition(ros::NodeHandle nh,
 			std::string frame) {
-
-		std::cout << "get position procedure" << std::endl;
-		std::cout << frame << std::endl;
 		geometry_msgs::PoseStamped pose;
 
 		ros::ServiceClient get_state_client_ = nh.serviceClient<
@@ -1248,7 +1231,6 @@ public:
 		arm_navigation_msgs::GetRobotState::Request req;
 		arm_navigation_msgs::GetRobotState::Response res;
 		get_state_client_.call(req, res);
-		std::cout << res.error_code << std::endl;
 
 		ros::service::waitForService("pr2_right_arm_kinematics/get_fk");
 		ros::ServiceClient fk_client = nh.serviceClient<
@@ -1263,12 +1245,14 @@ public:
 		fk_request.fk_link_names[0] = "r_wrist_roll_link";
 		fk_request.robot_state = res.robot_state;
 		if (fk_client.call(fk_request, fk_response)) {
-			std::cout << fk_response.fk_link_names[0] << std::endl;
-			std::cout << fk_response.pose_stamped[0].header.frame_id;
+			//std::cout << fk_response.fk_link_names[0] << std::endl;
+			//std::cout << fk_response.pose_stamped[0].header.frame_id
+				//	<< std::endl;
 			pose = fk_response.pose_stamped[0];
+			//cout << "Right arm pose:" << endl;
 			printPose(pose);
 		} else {
-			std::cout << "can't get link info" << std::endl;
+			//std::cout << "can't get link info" << std::endl;
 		}
 		printPose(pose);
 		return pose;
@@ -1428,7 +1412,8 @@ void clusterObsBBInit(
 	q += boost::lexical_cast<std::string>(particles);
 	q += ")";
 
-	//cout << q << endl;
+	//cout << endl;
+	cout << q << endl;
 	sendQuery(q);
 }
 
@@ -1609,9 +1594,8 @@ void objectsObservationsIteration(
 	q += "],";
 	q += boost::lexical_cast<std::string>(particles);
 	q += ")";
-
-	//cout << q << endl;
-	sendQuery(q);//TODO TODO
+	cout << q << endl;
+	sendQuery(q);
 }
 
 tabletop_collision_map_processing::TabletopCollisionMapProcessing scanTableIteration(
@@ -1637,7 +1621,7 @@ tabletop_collision_map_processing::TabletopCollisionMapProcessing scanTableItera
 		//		"Scanning table for first time failed: The tabletop detector detected the table, " "but found no objects");
 	}
 
-	//objectsObservationsIteration(detection_call, nh);
+	objectsObservationsIteration(detection_call, nh);
 	//TODO
 	tabletop_collision_map_processing::TabletopCollisionMapProcessing processing_call;
 	processing_call.request.detection_result =
@@ -1674,8 +1658,7 @@ void objectsObservationsInit(
 	q += ",";
 	q += boost::lexical_cast<std::string>(particles);
 	q += ")";
-
-	//cout << q << endl;
+	cout << q << endl;
 	sendQuery(q);
 
 	ros::ServiceClient househ_srv = nh.serviceClient<
@@ -1865,7 +1848,7 @@ void tableObservationsInit(tabletop_object_detector::TabletopDetection det) {
 	q += "],";
 	q += boost::lexical_cast<std::string>(particles);
 	q += ")";
-	//cout << q << endl;
+	cout << q << endl;
 	sendQuery(q);
 }
 
@@ -1921,7 +1904,7 @@ void scanTableInit(ros::ServiceClient object_detection_srv,
 void dcpf(int particles) {
 
 	YAP_Term error;
-	int res = YAP_RunGoal(YAP_ReadBuffer("use_module('init.pl')", &error));
+	int res = YAP_RunGoalOnce(YAP_ReadBuffer("use_module('init.pl')", &error));
 	if (res == 1)
 		ROS_INFO("OK: module loaded");
 	else
@@ -2043,13 +2026,10 @@ bool perform_action(string action, string param[],
 					"base_link");
 			right.setPickupLocation(start_pose2);
 			right.setOrientation(start_pose2);
-			//right.moveSideStandard(nh);
-
 			right.moveSide(nh, start_pose2.pose.orientation.x,
 					start_pose2.pose.orientation.y,
 					start_pose2.pose.orientation.z,
 					start_pose2.pose.orientation.w);
-
 		}
 		if (param[4] == "left_gripper") {
 			left.pickup(processing_call, index_go, nh);
@@ -2057,14 +2037,10 @@ bool perform_action(string action, string param[],
 					"base_link");
 			left.setPickupLocation(start_pose2);
 			left.setOrientation(start_pose2);
-			//left.moveSideStandard(nh);
-
 			left.moveSide(nh, start_pose2.pose.orientation.x,
 					start_pose2.pose.orientation.y,
 					start_pose2.pose.orientation.z,
 					start_pose2.pose.orientation.w);
-
-
 		}
 	}
 	if (action == "place") {
@@ -2110,7 +2086,7 @@ bool perform_action(string action, string param[],
 		qinfo += ",";
 		qinfo += boost::lexical_cast<std::string>(particles);
 		qinfo += ")";
-		//cout << qinfo << endl;
+		cout << qinfo << endl;
 		sendQuery(qinfo);
 
 		string qwa = "current_wa_query(";
@@ -2118,65 +2094,31 @@ bool perform_action(string action, string param[],
 		qwa += ",";
 		qwa += boost::lexical_cast<std::string>(particles);
 		qwa += ")";
-		//cout << qwa << endl;
+		cout << qwa << endl;
 		sendQuery(qwa);
 	}
 	success = true; //TODO
 	return success;
 }
+
 int main(int argc, char **argv) {
-	ros::init(argc, argv, "get_ik");
-	ros::NodeHandle nh;
+	ros::init(argc, argv, "pick_and_place_app");
+	ros::NodeHandle nh("~");
 
-	/*
-	geometry_msgs::PoseStamped pose;
-
-			ros::ServiceClient get_state_client_ = nh.serviceClient<
-					arm_navigation_msgs::GetRobotState>(
-					"/environment_server/get_robot_state");
-			arm_navigation_msgs::GetRobotState::Request req;
-			arm_navigation_msgs::GetRobotState::Response res;
-			get_state_client_.call(req, res);
-			std::cout << res.error_code << std::endl;
-
-			ros::service::waitForService("pr2_left_arm_kinematics/get_fk");
-			ros::ServiceClient fk_client = nh.serviceClient<
-					kinematics_msgs::GetPositionFK>(
-					"pr2_left_arm_kinematics/get_fk");
-
-			kinematics_msgs::GetPositionFK::Request fk_request;
-			kinematics_msgs::GetPositionFK::Response fk_response;
-
-			fk_request.header.frame_id = "base_link";
-			fk_request.fk_link_names.resize(1);
-			fk_request.fk_link_names[0] = "l_wrist_roll_link";
-			fk_request.robot_state = res.robot_state;
-			if (fk_client.call(fk_request, fk_response)) {
-				std::cout << fk_response.fk_link_names[0] << std::endl;
-				std::cout << fk_response.pose_stamped[0].header.frame_id
-						<< std::endl;
-				pose = fk_response.pose_stamped[0];
-				std::cout << "Wrist pose currently:" << std::endl;
-						std::cout << pose.pose.position.x << std::endl;
-						std::cout << pose.pose.position.y << std::endl;
-						std::cout << pose.pose.position.z << std::endl;
-						std::cout << pose.pose.orientation.x << std::endl;
-						std::cout << pose.pose.orientation.y << std::endl;
-						std::cout << pose.pose.orientation.z << std::endl;
-						std::cout << pose.pose.orientation.w << std::endl;
-
-			} else {
-				//std::cout << "can't get link info" << std::endl;
-			}
-*/
-
-	int n_particles = 1000;
+	int n_particles = 2000;// = -1;
+	//nh.getParam("np", n_particles);
+	ROS_INFO("n_particles %d", n_particles);
 
 	if (YAP_FastInit(NULL) == YAP_BOOT_ERROR)
 		return 1;
 
+	cout << "dcpf call start" << endl;
 	dcpf(n_particles);
+	cout << "dcpf call end" << endl;
+	//dcpf(particles);
+
 	particles = n_particles;
+
 	ros::ServiceClient object_detection_srv;
 	ros::ServiceClient collision_processing_srv;
 
@@ -2256,13 +2198,13 @@ int main(int argc, char **argv) {
 			string qn = "needBeginObservation(human(1),";
 			qn += boost::lexical_cast<std::string>(particles);
 			qn += ")";
-			//cout << qn << endl;
+			cout << qn << endl;
 			sendQuery(qn);
 
 			string q3 = "actionDemandObservation(human(1),";
 			q3 += boost::lexical_cast<std::string>(particles);
 			q3 += ")";
-			//cout << q3 << endl;
+			cout << q3 << endl;
 			sendQuery(q3);
 
 			bool satisfied_user = false;
@@ -2277,8 +2219,10 @@ int main(int argc, char **argv) {
 				q4 += ",";
 				q4 += boost::lexical_cast<std::string>(particles);
 				q4 += ")";
-				//cout << q4 << endl;
+				cout << q4 << endl;
 				sendQuery(q4);
+
+				YAP_Term error1;
 
 				cout << "Calculating best action." <<endl;
 				YAP_Term arg[2];
@@ -2292,12 +2236,11 @@ int main(int argc, char **argv) {
 						arg);
 				long safe_t = YAP_InitSlot(tmp);
 
-				int res = YAP_RunGoal(tmp);
+				int res = YAP_RunGoalOnce(tmp);
 				char s[100];
 				YAP_WriteBuffer(YAP_ArgOfTerm(1, YAP_GetFromSlot(safe_t)), s,
 						100, YAP_WRITE_HANDLE_VARS);
 
-				YAP_RecoverSlots(1);
 				string result = s;
 				cout << result << endl;
 				string result2 = "(";
@@ -2348,10 +2291,11 @@ int main(int argc, char **argv) {
 				qstart += ",";
 				qstart += boost::lexical_cast<std::string>(particles);
 				qstart += ")";
-				//cout << qstart << endl;
+				cout << qstart << endl;
 				sendQuery(qstart);
 
-				//cout << action << endl;
+				cout << " -----"<<endl;
+				cout << action << endl;
 
 				bool end = perform_action(action, param, processing_call,
 						nh, left, right);
@@ -2361,10 +2305,10 @@ int main(int argc, char **argv) {
 					qsuccess += ",";
 					qsuccess += boost::lexical_cast<std::string>(particles);
 					qsuccess += ")";
-					//cout << qsuccess << endl;
+					cout << qsuccess << endl;
 					sendQuery(qsuccess);
 
-					//cout << action << endl;
+					cout << action << endl;
 					if(action == "pickup" || action == "place"){
 
 					string feedbackeffect;
@@ -2377,7 +2321,7 @@ int main(int argc, char **argv) {
 												qeff += ",";
 												qeff += boost::lexical_cast<std::string>(particles);
 												qeff += ")";
-												//cout << qeff << endl;
+												cout << qeff << endl;
 												sendQuery(qeff);
 					}
 					else{
@@ -2386,7 +2330,7 @@ int main(int argc, char **argv) {
 																		qeff += ",";
 																		qeff += boost::lexical_cast<std::string>(particles);
 																		qeff += ")";
-																		//cout << qeff << endl;
+																		cout << qeff << endl;
 																		sendQuery(qeff);
 					}
 					}
@@ -2403,11 +2347,11 @@ int main(int argc, char **argv) {
 						q5 += ",";
 						q5 += boost::lexical_cast<std::string>(particles);
 						q5 += ")";
-						//cout << q5 << endl;
+						cout << q5 << endl;
 						sendQuery(q5);
 					}
 					if (feedback == "no") {
-
+						YAP_Term error3;
 						YAP_Term arg3[2];
 						arg3[0] = YAP_MkIntTerm(particles);
 						arg3[1] = YAP_MkVarTerm();
@@ -2418,12 +2362,11 @@ int main(int argc, char **argv) {
 								2, arg3);
 						long safe_t3 = YAP_InitSlot(tmp3);
 
-						int res3 = YAP_RunGoal(tmp3);
+						int res3 = YAP_RunGoalOnce(tmp3);
 						char s3[100];
 						YAP_WriteBuffer(
 								YAP_ArgOfTerm(2, YAP_GetFromSlot(safe_t3)), s3,
 								100, YAP_WRITE_HANDLE_VARS);
-						YAP_RecoverSlots(1);
 						string result3 = s3;
 						string result2a = "(";
 						result2a += result3;
@@ -2471,8 +2414,7 @@ int main(int argc, char **argv) {
 						qstart2 += ",";
 						qstart2 += boost::lexical_cast<std::string>(particles);
 						qstart2 += ")";
-						cout << "compensation action unwanted" << endl;
-						//cout << qstart2 << endl;
+						cout << qstart2 << endl;
 						sendQuery(qstart2);
 						/*TODO
 						string qs = "positive_feedback(";
@@ -2484,7 +2426,7 @@ int main(int argc, char **argv) {
 						cout << qs << endl;
 						sendQuery(qs);
 						*/
-						cout << "compensation action performactionproc" << endl;
+
 						bool successa = perform_action(actiona, parama,
 								processing_call, nh, left, right);
 						if (successa) {
@@ -2518,7 +2460,7 @@ int main(int argc, char **argv) {
 					q_unsuccess += ",";
 					q_unsuccess += boost::lexical_cast<std::string>(particles);
 					q_unsuccess += ")";
-					//cout << q_unsuccess << endl;
+					cout << q_unsuccess << endl;
 					sendQuery(q_unsuccess);
 					//cout << "Could not perform wanted action" << endl; //EXTENSIE naar dcpf juiste update
 				}

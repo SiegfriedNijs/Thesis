@@ -1,0 +1,14 @@
+#include <stdio.h>
+#include "Yap/YapInterface.h"
+
+int main(int argc, char *argv[]) {
+  if (YAP_FastInit(0) == YAP_BOOT_ERROR)
+    return 1;
+  YAP_Term error;
+  int res= YAP_RunGoalOnce(YAP_ReadBuffer("write(1)",&error));
+
+  if(res==1)
+    printf("Success\n");
+  else
+  	printf("NO\n");
+}

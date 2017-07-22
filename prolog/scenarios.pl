@@ -5,7 +5,9 @@
 :- use_module('knowledge_base.pl').
 :- use_module('knowledge_processing.pl').
 :- use_module('init.pl').
+:- use_module('command_processing.pl').
 :- use_module('color_processing.pl').
+:- use_module('perception_module.pl').
 :- use_module('action_decision.pl').
 :- use_module(library(lists)).
 :- use_module(library(charsio)).
@@ -13,38 +15,6 @@
 
 lifted(false).
 raoblackwellisation(false).
-
-s_test :-
-	N is 100,
-	initdcpf(N),
-	gripper_location(left_gripper,[0.34999999999999998,0.75,1.05],N),
-	gripper_location(right_gripper,[0.29999999999999999,-0.75,1.05],N),
-
-	tableObservation([0.65685790655403253,0.99562966810066333,0.20000000000000001],[0.667174459,0.00335927983,0.383494049],N),
-	nobjsObservationInit(3,N),
-	colorObservationInit(1,[165,109,49],N),
-	locationObservationInit(1,[0.0587398708,0.184396714,0.113916188],[0.506681323,-0.092198357,0.550515056],N),
-	colorObservationInit(2,[159,100,42],N),
-	locationObservationInit(2,[0.051786989,0.0564360768,0.133395076],[0.509086907,0.0652225092,0.560042858],N),
-	colorObservationInit(3,[169,113,58],N),
-	locationObservationInit(3,[0.0183226466,0.0599130988,0.113717496],[0.986414909,-0.00238251034,0.550136209],N),
-	typeObservationInit(1,[1671.02026:18744,888.998657:18797,394.073578:18802,334.811432:18783,300.64505:18748,209.941071:18751,158.177353:18807,155.289688:18659,144.582993:18658,139.131119:18646,130.260864:18652,128.140808:18951,122.353951:18704,117.378662:18794,81.9690552:18645,79.0995865:18760],N),
-
-	typeObservationInit(2,[1151.97546:18802,367.045074:18783,261.034973:18744,233.462433:18797,172.030945:18646,167.819321:18751,163.24115:18748,118.238739:18807,117.543571:18704,113.892715:18659,113.124802:18794,108.859703:18658,108.697365:18951,99.0563049:18760,73.1665573:18652,69.7457886:18645],N),
-
-typeObservationInit(3,[760.38739:18802,342.146149:18646,279.619324:18704,279.450043:18951,237.989334:18659,204.906769:18658,190.323547:18794,189.898941:18760,165.755875:18751,165.334503:18748,145.574585:18783,137.10524:18652,126.356773:18807,97.3773041:18645,74.3472595:18744,73.5606003:18797],N),
-
-
-needBeginObservation(human(1),N),
-actionDemandObservation(human(1),N),
-commandObservation(human(1),[],N),
-get_best_waction((Name,Cat,Params),N),
-
-start_performance(Name,N),
-end_performance(Name,N),
-
-	pos_wanted_effect(Name,N),
-	positive_feedback(Name,N).
 
 
 %scenario1objects :-
@@ -73,8 +43,7 @@ s1 :-
 	get_best_waction(human(1),(Name,Cat,Params),N),
 	start_performance(Name,N),
 	end_performance(Name,N),
-	pos_wanted_effect(Name,N),
-	positive_feedback(Name,N).
+	pos_wanted_effect(Name,N).
 
 
 %scenario2objects :-
@@ -847,24 +816,6 @@ scenario11 :-
 	step_particle([action(nonhuman)],[],N),	
 	eval_query_particle2(B2,current(has_category(humans_ca,human1))~=B2,N,R2),
 	writeln(R2),nl.
-
-s_test :-
-	N is 2000,
-	initdcpf(N),
-	gripper_location(left_gripper,[0.20000000000000001,0.5,1],N),
-	gripper_location(right_gripper,[0.29999999999999999,-0.75,1.05],2000),
-	tableObservation([0.6503485180276567,0.99559834176184281,0.20000000000000001],[0.670519233,0.00333563751,0.38350597],2000),
-
-	nobjsObservationInit(3,2000),
-	locationObservationInit(1,[0.0590888262,0.184062287,0.113773733],[0.506228745,-0.0920311436,0.550198793],2000),
-	locationObservationInit(2,[0.0543677211,0.0574410222,0.133281916],[0.509840131,0.0650972351,0.559805334],2000),
-	locationObservationInit(3,[0.019020021,0.0607084334,0.113789916],[0.986155272,-0.00236570463,0.549385309],2000),
-	
-	actionDemandObservation(human(1),2000),
-	commandObservation(human(1),[],2000).
-
-
-	
 
 s1 :-
 	N is 200,

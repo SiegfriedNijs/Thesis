@@ -7,11 +7,15 @@
 :- use_module('../random/sampling.pl').
 :- use_module('knowledge_base.pl').
 :- use_module('knowledge_processing.pl').
+:- use_module('command_processing.pl').
+:- use_module('perception_module.pl').
 :- use_module('ontology.pl').
 :- set_magic(backward). 
 
 lifted(false).
 raoblackwellisation(false).
+
+
 %:- style_check(all).
 
 :- set_magic(backward). %NP
@@ -95,30 +99,26 @@ builtin(ontable).
 builtin(stillholding).
 
 satisfiable(findall(_,_,_)).
+
 builtin(\+A) :-
 	builtin(A).
+
 checkvalue(true,1.0).
 checkvalue(false,0.0).
 
-/*
-Observation to indicate whether this interpretation exists or not.
-*/
+essentialparameters(pickup_ca,[object_pickedup(pickup_ca, moveablethings_ca), has_performer(pickup_ca, actionperformers_ca), uses_gripper(pickup_ca, robotarms_ca)]).%NP
+acts_on_object(pickup_ca, moveablethings_ca).%NP
+pickup(pickup_ca, spatialobjects_ca).%NP
+can_perform(pr2_ca,pickup_ca).%NP
+
 observation(exists):t+1 ~ val(true) := true.
 
-/*
-Number of objects available in surroundings, van be set certain or uncertain.
-*/
+maxobjs(5).
 nobjs:0 ~ uniform([1,2,3,4,5]) := true.
 %nobjs:0 ~ val(3).
 nobjs:t+1 ~ val(NO) := 
 	nobjs:t ~= NO.
-object(N):t ~ val(true) := 
-	nobjs:t ~= Nu, 
-	between(1,Nu,N).
 
-/*
-Simple observation model for number of objects seen in one iteration, able to deal with perception issues like occlusion.
-*/
 observation(nobjsinit):t+1 ~ uniform(L) :=
 	nobjs:t+1 ~= NO,
 	findall(X,between(0,NO,X),L).
@@ -126,9 +126,6 @@ observation(nobjsit):t+1 ~ uniform(L) :=
 	nobjs:t+1 ~= NO,
 	findall(X,between(0,NO,X),L).
 
-/*
-Whether on object has been seen depends on the probabilistic re-recognition of one.
-*/
 seen(object(N)):0 ~ val(false) :=
 	nobjs:0 ~= Nu,
 	between(1,Nu,N).
@@ -137,32 +134,18 @@ seen(object(N)):t+1 ~ val(true) :=
 seen(object(N)):t+1 ~ val(B) :=
 	seen(object(N)):t ~=B.
 
-/*
-All fluidholders have a content, with "empty" being consider as content too.
-*/
+object(N):t ~ val(true) := 
+	nobjs:t ~= Nu, 
+	between(1,Nu,N).
+
 content(N):t ~ val(true) :=
 	object(N):t ~= true,
 	has_category(fluidholders_ca,object(N)):t ~= true.
 content(N):t ~ val(false) := 
 	object(N):t ~= true,
 	has_category(fluidholders_ca,object(N)):t ~= false.
+%NP aanvullen voor andere containers
 
-/*
-Probabilistic object categorization after RANSAC recognition action.
-*/
-obj_category(object(N)):0 ~ val(none) :=
-	nobjs:0 ~= Nu, 
-	between(1,Nu,N).
-obj_category(object(N)):t+1 ~ finite(Distr) :=
-	action(segm(object(N),Distr)).
-obj_category(object(N)):t+1 ~ val(Val) :=
-	action(cat_ev(object(N),Val)).
-obj_category(object(N)):t+1 ~ val(Cat) :=
-	obj_category(object(N)):t ~= Cat.
-
-/*
-Categorization of concept "robot/myself" in ontology.
-*/
 myself(pr2robot1).
 has_category(pr2_ca,pr2robot1).
 has_category(Super,pr2robot1) :-
@@ -170,98 +153,131 @@ has_category(Super,pr2robot1) :-
 	is_subcategory(Sub,Super),
 	has_category(Sub,pr2robot1).
 
-/*
-Categorization of concept "human" in ontology.
-*/
 human(1).
 has_category(humans_ca,human(N)).
 has_category(Super,human(N)) :-
 	category(Super),
-	is_subcategory(Sub,Super), 	
+	is_subcategory(Sub,Super), %NP kan sneller + dcpf	
 	has_category(Sub,human(N)).
 
-/*
-Categorization of concept "table" in ontology.
-*/
 has_category(tables_ca,table).
 has_category(Super,table) :-
 	category(Super),
-	is_subcategory(Sub,Super),
+	is_subcategory(Sub,Super), %NP kan sneller + dcpf
 	has_category(Sub,table).
 
-/*
-Categorization (probabilistic) of concept "object" in ontology.
-*/
+%NP andere regels hier plus superklassen en wat al sowieso false is op hoger niveau bij objs
 has_category(moveablethings_ca,object(N)):t ~ val(true).
 has_category(Cat,object(N)):t ~ val(true) :=
 	category(Cat),
 	obj_category(object(N)):t ~= Cat.
+
+/*
 has_category(Super,object(N)):t ~ val(true) :=
+	category(Super),
+	obj_category(object(N)):t ~= Sub,	
+	%is_subcategory(Sub,Super).	
+*/
+
+ has_category(Super,object(N)):t ~ val(true) :=
  	category(Super),
 	subcategory(Sub,Super), 
 	has_category(Sub,object(N)):t ~= true.
-has_category(_,object(N)):t ~ val(false).
+ has_category(_,object(N)):t ~ val(false).
 
-/*
-Categorization (probabilistic) of concept "content" in ontology.
-*/
+getProbList(Cat,L2,CatProb,ProbList) :-
+	Begin = [CatProb:Cat],
+	length(L2,Length),
+
+	(Length == 1 ->
+		ProbList = [1:Cat]
+	;
+		delete(L2, Cat, Rest),
+		length(Rest,Length2),
+		N2 is (1 - CatProb), 
+		Prob2 is N2/Length2,
+		getProbList2(Prob2,Rest,Result),
+		append(Begin,Result,ProbList)
+	).
+
+getProbList2(_,[],[]).
+getProbList2(Prob2,[H|R],[(Prob2:H)|R2]) :-
+	getProbList2(Prob2,R,R2).
+
+ holds_fluid(object(N)):t ~ finite([0.5:cola_ca,0.5:nothing]) :=
+	has_category(can,object(N)):t ~= true.
+ holds_fluid(object(N)):t ~ finite([0.3:cola_ca,0.4:water_ca,0.3:nothing]) :=
+	has_category(cup,object(N)):t ~= true.
+ holds_fluid(object(N)):t ~ finite([0.5:water_ca,0.5:nothing]) :=
+	has_category(mug,object(N)):t ~= true.
+ holds_fluid(object(N)):t ~ finite([0.5:nondrinkablefluid_ca,0.5:nothing]) :=
+	has_category(nondrinking_bottle,object(N)):t ~= true.
+
+ holds_fluid(object(N)):t+1 ~ val(Val) :=
+	holds_fluid(object(N)):t ~= Val.
+
 has_category(Category, content(N)):t ~ val(true) :=
 	holds_fluid(object(N)):t ~= Category.
+
 has_category(Super,content(N)):t ~ val(true) :=
 	category(Super),
 	subcategory(Sub,Super), 
 	has_category(Sub,content(N)):t ~= true.
-has_category(_,content(N)):t ~ val(false).
+has_category(_,content(N)):t ~ val(false). 
 
 /*
-Knowledge on a certain fluidholder category containing some drink.
-*/
-holds_fluid(object(N)):t ~ finite([0.5:cola_ca,0.5:nothing]) :=
-	has_category(can,object(N)):t ~= true.
-holds_fluid(object(N)):t ~ finite([0.3:cola_ca,0.4:water_ca,0.3:nothing]) :=
-	has_category(cup,object(N)):t ~= true.
-holds_fluid(object(N)):t ~ finite([0.5:water_ca,0.5:nothing]) :=
-	has_category(mug,object(N)):t ~= true.
-holds_fluid(object(N)):t ~ finite([0.5:nondrinkablefluid_ca,0.5:nothing]) :=
-	has_category(nondrinking_bottle,object(N)):t ~= true.
-holds_fluid(object(N)):t+1 ~ val(Val) :=
-	holds_fluid(object(N)):t ~= Val.
+holds_fluid(object(N)):t ~ val(Fluid) :=
+	has_category(fluidholders_ca,object(N)):t ~= true,
+	has_category(Fluid,content(N)):t ~=true.
+*/	
+
+obj_category(object(N)):0 ~ val(none) := %NP prior 
+	nobjs:0 ~= Nu, 
+	between(1,Nu,N).
+obj_category(object(N)):t+1 ~ finite(Distr) :=
+	action(segm(object(N),Distr)).
+obj_category(object(N)):t+1 ~ val(Val) :=
+	action(cat_ev(object(N),Val)).
+obj_category(object(N)):t+1 ~ val(Cat) :=
+	obj_category(object(N)):t ~= Cat.	
 
 /*
-Human needs, attention model. Extension for user action recognition.
+Human needs
 */
-/*
+
 attention_towards(human(N)):0 ~ val(nothing).
 attention_towards(human(N)):t+1 ~ val(O) :=
 	action(attention(O)).
 attention_towards(human(N)):t+1 ~ val(O) :=
 	attention_towards(human(N)):t ~= O.
-*/
 
-/*
-All humans are inside the kitchen for the experiment.
-*/
 inside_room(human(N),kitchen) :-
 	human(N).
 
 /*
-Chances of a user having a certain craving, given the room the user is in.
+has_craving(human(1),thirst):0 ~ finite([0.9: true, 0.1:false]) :=
+	inside_room(human(1),kitchen).
+has_craving(human(1),hunger):0 ~ finite([0.5: true, 0.5:false]) :=
+	inside_room(human(1),kitchen).
 */
 has_craving(human(1),thirst):t+1 ~ finite([0.9: true, 0.1:false]) :=
-	action(cravingbegin(human(1))),
+	action(needbegin(human(1))),
 	inside_room(human(1),kitchen).
 has_craving(human(1),thirst):t+1 ~ finite([0.9: false, 0.1:true]) :=
-	action(cravingbegin(human(1))),	
+	action(needbegin(human(1))),	
 	inside_room(human(1),bedroom). 
 has_craving(human(1),hunger):t+1 ~ finite([0.5: true, 0.5:false]) :=
-	action(cravingbegin(human(1))),
+	action(needbegin(human(1))),
 	inside_room(human(1),kitchen).
+/*
+has_craving(human(N),Craving):t+1 ~ uniform([true,false]) :=
+	action(needbegin(human(N))),	
+	subcategory(Craving,cravings_ca).
+*/
 has_craving(human(N),Craving):t+1 ~ val(C) :=
 	has_craving(human(N),Craving):t ~= C.
 
-/*
-The real intention or need of a user is depending on his or her cravings.
-*/
+
 has_need(human(N)):t+1 ~ finite([0.3:obtain_item(drinkablefluids_ca),0.3:obtain_item(eatingtools_ca),0.2:obtain_item(moveablethings_ca),0.1:cleanup,0.1:info]) :=
 	action(needbegin(human(N))),
 	human(N),
@@ -278,25 +294,71 @@ has_need(human(N)):t+1 ~ finite([0.6:obtain_item(eatingtools_ca),0.2:obtain_item
 	human(N),
 	inside_room(human(N),kitchen),
 	has_craving(human(N),hunger):t ~= true.
+
+
 has_need(human(N)):t+1 ~ finite([0.7:obtain_item(moveablethings_ca),0.3:info]) :=
 	action(needbegin(human(N))),
 	human(N),
 	inside_room(human(N),kitchen).
-has_need(human(N)):t+1 ~ finite([0.9:info,0.1:obtain_item(moveablethings_ca)]) := 
+
+
+has_need(human(N)):t+1 ~ finite([0.9:info,0.1:obtain_item(moveablethings_ca)]) := %,0.1:cleanup
 	action(needbegin(human(N))),
 	human(N),
 	inside_room(human(N),testroom).
+
 has_need(human(N)):t+1 ~ uniform([obtain_item(moveablethings_ca),info]) :=
 	action(needbegin(human(N))),
 	human(N).	
 has_need(human(N)):t+1 ~ val(Need) :=
 	has_need(human(N)):t ~= Need.
 
+	
+performing_action(T2) ~ val(false) :=
+	timepoint(T),
+	T2 is T+1,
+	succes_performance(_,T).
+performing_action(T2) ~ val(true) :=
+	timepoint(T),
+	T2 is T+1,
+	start_performance(_,T).
+performing_action(T2) ~ val(B) :=
+	timepoint(T),
+	T2 is T+1,
+	performing_action(T) ~= B.
+performing_action(_) ~ val(false) := true.
 
 /*
-Care model section.
-Once a user indicates an action is wanted we attach a prior chance to the wa distribution of the user not caring about a certain choice.
+wants_action(human(N)):0 ~ val(false) := 	
+	human(N).
+wants_action(human(N)):t+1 ~ val(true) :=
+	human(N),
+	action(actiondemand(human(N))).
+wants_action(human(N)):t+1 ~ val(B) :=
+	human(N),
+	wants_action(human(N)):t ~= B. 
 */
+
+/*
+wanted_action(human(N)):t+1 ~ uniform(Performable) :=
+	human(N),
+	action(wabegin),
+	attention_towards(human(N)):t ~= At,
+	At \= nothing,
+	performable(pickup_ca):t ~= Lpickup,
+	performable(place_ca):t ~= Lplace,
+	performable(answerquestion_ca):t ~= Q,
+	append(Lpickup,Lplace,R1),
+	append(R1,Q,R2),
+	pruneFocusID(R2,At):t ~= Performable,
+	writeln(Performable).
+*/
+
+/*
+Care model sectie.
+*/
+
+%TODO extend model with more state knowledge, extend wa with list!
 care(human(N),type):t+1 ~ finite([0.9:care,0.1:nocare]) :=
 	human(N),
 	action(wabegin).
@@ -309,29 +371,37 @@ care(human(N),tool):t+1 ~ finite([0.3:care,0.7:nocare]) :=
 care(human(N),T):t+1 ~ val(Bool) :=
 	care(human(N),T):t ~= Bool.
 
+%update met observaties
+
 /*
-Calculation of all possible wanted actions based on the probabilistic need.
+observation(negfeedback(human(N))):t+1 ~ val(Neg) :=
+	wanted_action(human(N)):t+1 ~= WA,
+	writeln(WA),
+	writeln(Neg),
+	WA \= Neg,
+	writeln(feedbacktest).
 */
-wanted_action(human(N)):t+1 ~ uniform(Pr3) :=
-	human(N), 
+
+observation(posfeedback(human(N))):t+1 ~ val(WA) :=
+	wanted_action(human(N)):t+1 ~= WA.
+	%writeln(WA).
+
+wanted_action(human(N)):t+1 ~ uniform(Pr2) :=
+	human(N), %TODO
 	action(wabegin),
 	has_need(human(N)):t ~= obtain_item(drinkablefluids_ca),
 	performable(pickup_ca):t ~= Lpickup,
 	performable(place_ca):t ~= Q,
 	pruneFocusType(Lpickup,fluidholders_ca):t ~= Pruned,
-	append(Q,Pruned,Pr2),
-	performable(answerquestion_ca):t ~= Q2,
-	append(Pr2,Q2,Pr3).
-wanted_action(human(N)):t+1 ~ uniform(Pr3) :=
+	append(Q,Pruned,Pr2).
+wanted_action(human(N)):t+1 ~ uniform(Pr2) :=
 	human(N),
 	action(wabegin),
 	has_need(human(N)):t ~= obtain_item(Cat),
 	performable(pickup_ca):t ~= Lpickup,
 	pruneFocusType(Lpickup,Cat):t ~= Pruned,
 	performable(place_ca):t ~= Q,
-	append(Q,Pruned,Pr2),
-	performable(answerquestion_ca):t ~= Q2,
-	append(Pr2,Q2,Pr3).
+	append(Q,Pruned,Pr2).
 wanted_action(human(N)):t+1 ~ uniform(Cl2) :=
 	human(N),
 	action(wabegin),
@@ -346,14 +416,23 @@ wanted_action(human(N)):t+1 ~ uniform(Q) :=
 	action(wabegin),
 	has_need(human(N)):t ~= info,
 	performable(answerquestion_ca):t ~= Q.
-wanted_action(human(N)):t+1 ~ uniform(L2) := %general wanted_action without need context
+
+%general wanted_action without need context
+
+wanted_action(human(N)):t+1 ~ uniform(L1) :=
+	
 	human(N),
 	action(wabegin),
+	
+	%has_need(human(N)):t ~= Need,
+	%findall(Sub,subcategory(Sub,performableactions_ca),L2),
 	performable(pickup_ca):t ~= Lpickup,
 	performable(place_ca):t ~= Lplace,
-	performable(answerquestion_ca):t ~= Q,
-	append(Lplace,Lpickup,L1),
-	append(L1,Q,L2).
+	%performable(answerquestion_ca):t ~= Q,
+	
+	append(Lplace,Lpickup,L1).
+	%append(L1,Q,L2).
+
 wanted_action(human(N)):t+1 ~ val(nothing_possible) :=
 	human(N),
 	action(wabegin),
@@ -361,18 +440,11 @@ wanted_action(human(N)):t+1 ~ val(nothing_possible) :=
 	performable(place_ca):t ~= Lplace,
 	append(Lplace,Lpickup,R),
 	R=[].
+
 wanted_action(human(N)):t+1 ~ val(B) :=
 	wanted_action(human(N)):t ~= B.
 
-/*
-A positive feedback on a performed action (from the user) can only occur if it was a wanted action.
-*/
-observation(posfeedback(human(N))):t+1 ~ val(WA) :=
-	wanted_action(human(N)):t+1 ~= WA.
-
-/*
-Extra HRI vocabulary, coupling the statement to the implications for the wanted action.
-*/
+%extra vocabulary
 wants_to_move(human(N),object(O)):t ~ val(true) :=
 	wanted_action(human(N)):t ~= (pickup,object(O),_).
 wants_to_move(human(N),object(O)):t ~ val(true) :=
@@ -392,37 +464,40 @@ wants_tool_used(human(N)):t ~ val(Tool) :=
 wants_object(Cat,human(N)):t ~ val(true) :=
 	wanted_action(human(N)):t ~= (pickup,object(O),_),
 	has_category(Cat,object(O)):t ~= true.
+
+
 wants_object(Cat,human(N)):t ~ val(false).
 
 wants_info_on(human(N),object(O)):t ~ val(true) :=
 	wanted_action(human(N)):t ~= (info,object(O),_).
 wants_info_on(human(N),object(O)):t ~ val(false).
 
-wants_drinkablefluid(human(N)):t ~ val(true) :=
+ wants_drinkablefluid(human(N)):t ~ val(true) :=
 	wanted_action(human(N)):t ~= (pickup,object(O),_),
 	content(O):t ~= true,
 	has_category(drinkablefluids_ca,content(O)):t ~=true.
-wants_drinkablefluid(human(N)):t ~ val(false).
+ wants_drinkablefluid(human(N)):t ~ val(false).
 
 wants_water(human(N)):t ~ val(true) :=
 	wanted_action(human(N)):t ~= (pickup,object(O),_),
 	content(O):t ~= true,
 	has_category(water_ca,content(O)):t ~=true.
-wants_water(human(N)):t ~ val(false).
+ wants_water(human(N)):t ~ val(false).
 
 cleanup(table):t ~ val(true) :=
 	wanted_action(human(N)):t ~= (pickup,object(O),_),
 	content(O):t ~= true,
 	holds_fluid(object(O)):t ~= nothing.
 
-/*
-Pruning of WA list based on object type.
-*/
+%NP extend...
+
 pruneFocusType([],_):t ~ val([]) := true.
 pruneFocusType([(AT,F,Params)|R],C):t ~ val([(AT,F,Params)|R2]) :=
+	%nl,
 	has_category(C,F):t ~= true,
 	pruneFocusType(R,C):t ~= R2.
 pruneFocusType([(AT,F,Params)|R],C):t ~ val(R2) :=
+	%nl,
 	has_category(C,F):t ~= false,
 	pruneFocusType(R,C):t ~= R2.
 pruneFocusType([(AT,F,Params)|R],C):t ~ val([(AT,F,Params)|R2]) :=
@@ -439,9 +514,6 @@ pruneFocusID([(AT,F,Params)|R],ID):t ~ val([(AT,F,Params)|R2]) :=
 pruneFocusID([(AT,F,Params)|R],ID):t ~ val(R2) :=
 	pruneFocusID(R,ID):t ~= R2.
 
-/*
-Calculation of possible and performable pickups given current surroundings.
-*/
 performable(pickup_ca):t ~ val(L) :=
 	findall_forward(
 	(pickup,object(ID),Gripper),
@@ -452,32 +524,34 @@ performable(pickup_ca):t ~ val(L) :=
 	)
 	,L).
 
-/*
-Calculation of possible and performable place actions given current surroundings.
-*/
 performable(place_ca):t ~ val(L) :=
 	findall_forward((place,Obj,X),
 	(current(holding_object(X)) ~= Obj,
 	Obj \= none),L). 
 
-/*
-Calculation of possible and performable info actions given current surroundings.
-*/
 performable(answerquestion_ca):t ~ val(L) :=
 	findall_forward((info,object(Obj),robotbrain), 
 	(current(object(Obj)) ~= true,
 	current(seen(object(Obj))) ~= true)
 	,L).
 
-/*
-List of grippers not holding anuthing.
-*/
 availablemeans(pickup_ca):t ~ uniform(Means) :=
 	findall_forward(X,current(holding_object(X)) ~= none,Means).
 
-/*
-Model of the two grippers holding an object, probabilistic depending on uncertain action effect.
-*/
+comm_category(command(N)):0 ~ val(unknown) := command(N) ~= true.
+comm_category(command(N)):t+1 ~ val(performphysicalactioncommands_ca) :=
+	command(N) ~= true,
+	action(gives_command(H,R,command(N))),
+	action(command_content(command(N),Content)),
+	member(pickup(_),Content).
+comm_category(command(N)):t+1 ~ uniform(L) :=
+	command(N) ~= true,
+	action(gives_command(H,R,command(N))),
+	findall(X,subcategory(X,commands_ca),L).
+comm_category(command(N)):t+1 ~ val(V) :=
+	command(N) ~= true,
+	comm_category(command(N)):t ~= V.
+
 holding_object(left_gripper):0 ~ val(none) := true.
 holding_object(right_gripper):0 ~ val(none) := true.
 
@@ -485,14 +559,18 @@ holding_object(Gripper):t+1 ~ val(O) :=
 	action(end_perf(PName)),
 	perf(PName,pickup,[O,_,_,_,Gripper]),
 	effect(PName):t ~= ingripper.
+	%writeln(holding1).
 holding_object(Gripper):t+1 ~ val(none) := 
 	action(end_perf(PName)),
 	perf(PName,pickup,[O,_,_,_,Gripper]),
 	effect(PName):t ~= fell.
+	%writeln(holding2).
 holding_object(Gripper):t+1 ~ val(none) := 
 	action(end_perf(PName)),
 	perf(PName,pickup,[O,_,_,_,Gripper]),
 	effect(PName):t ~= ontable.
+	%writeln(holding3).
+
 holding_object(Gripper):t+1 ~ val(none) := 
 	holding_object(Gripper):t ~= O,	
 	action(end_perf(PName)),
@@ -508,12 +586,10 @@ holding_object(Gripper):t+1 ~ val(O) :=
 	action(end_perf(PName)),
 	perf(PName,place,[O,_,_,_,Gripper]),
 	effect(PName):t ~= stillholding.
+
 holding_object(Gripper):t+1 ~ val(X) :=
 	holding_object(Gripper):t ~= X.
 
-/*
-Robot location self-knowledge, reachable common sense.
-*/
 right_shoulder(0,0.2,1).
 left_shoulder(0,-0.2,1).
 length_arm(0.9).
@@ -521,20 +597,22 @@ length_arm(0.9).
 gripper(left_gripper).
 gripper(right_gripper).
 
-reachable(object(N),Gr):t ~ finite([1:false]) :=
+ reachable(object(N),Gr):t ~ finite([1:false]) :=
 	has_position(object(N)):t ~= (X,Y,Z),
 	length_arm(LA),	
 	left_shoulder(XLS,YLS,ZLS),
 	distance((X,Y,Z),(XLS,YLS,ZLS),Distance),
 	Distance > LA.
-reachable(object(N),Gr):t ~ finite([0.95:true,0.05:false]) :=
+
+ reachable(object(N),Gr):t ~ finite([0.95:true,0.05:false]) :=
 	has_position(object(N)):t ~= (X,Y,Z),
 	length_arm(LA),	
 	Treshold is LA - 0.2,
 	left_shoulder(XLS,YLS,ZLS),
 	distance((X,Y,Z),(XLS,YLS,ZLS),Distance),
 	Distance < Treshold.
-reachable(object(N),Gr):t ~ finite([0.50:true,0.50:false]) := 
+%between treshold and arm length
+ reachable(object(N),Gr):t ~ finite([0.50:true,0.50:false]) := 
 	has_position(object(N)):t ~= (X,Y,Z),
 	length_arm(LA),	
 	Treshold is LA - 0.2,
@@ -542,6 +620,30 @@ reachable(object(N),Gr):t ~ finite([0.50:true,0.50:false]) :=
 	distance((X,Y,Z),(XLS,YLS,ZLS),Distance),
 	Distance > Treshold,
 	Distance < LA.
+
+/*
+graspable(object(N),right_gripper):0 ~ finite([0.9:true, 0.1:false]) :=
+	nobjs:0 ~= Nu,
+	between(1,Nu,N). 
+graspable(object(N),left_gripper):0 ~ finite([0.9:true, 0.1:false]) :=
+	nobjs:0 ~= Nu,
+	between(1,Nu,N).
+graspable(object(N),GR):t+1 ~ val(B) :=
+	graspable(object(N),GR):t ~= B.
+
+placeable(object(N),right_gripper):0 ~ finite([0.9:true, 0.1:false]) :=
+	nobjs:0 ~= Nu,
+	between(1,Nu,N). 
+placeable(object(N),left_gripper):0 ~ finite([0.9:true, 0.1:false]) :=
+	nobjs:0 ~= Nu,
+	between(1,Nu,N). 
+placeable(object(N),Gripper):t+1 ~ val(B) :=
+	placeable(object(N),Gripper):t ~= B.
+*/
+focus_constraints(_,_):t ~ val(false) :=
+	true.
+
+
 
 /*
 Performance approval.
@@ -560,6 +662,58 @@ good_perform(Perf):t+1 ~ val(false) :=
 good_perform(Perf):t+1 ~ val(B) :=
 	good_perform(Perf):t ~=B.
 
+precondition_focus_prune(pickup_ca,[]):t ~ val([]) := true.
+precondition_focus_prune(pickup_ca,[H|R]):t ~ val([H|R2]) :=
+	has_category(moveablethings_ca, H):t ~= true,
+	on(H,table):t ~= true, 
+	precondition_focus_prune(pickup_ca,R):t ~= R2.
+precondition_focus_prune(pickup_ca,[content(N)|R]):t ~ val([content(N)|R2]) :=
+	content(N):t ~= true,
+	has_category(fluids_ca, content(N)):t ~= true,
+	on(object(N),table):t ~= true, 
+	precondition_focus_prune(pickup_ca,R):t ~= R2.
+precondition_focus_prune(pickup_ca,[H|R]):t ~ val(R2) :=
+	precondition_focus_prune(pickup_ca,R):t ~= R2.
+precondition_focus_prune(place_ca,[]):t ~ val([]) := true.
+precondition_focus_prune(place_ca,[H|R]):t ~ val([H|R2]) :=
+	has_category(moveablethings_ca, H):t ~= true,
+	on(H,table):t ~= false, 
+	precondition_focus_prune(place_ca,R):t ~= R2.
+precondition_focus_prune(place_ca,[H|R]):t ~ val(R2) :=
+	precondition_focus_prune(place_ca,R):t ~= R2.
+
+prune_instances([],_,_,[]) ~ val(true) := true.
+prune_instances([H|R],Cat,T,[H|R2]) ~ val(Val) :=
+	has_category(Cat,H,T) ~=true,
+	prune_instances(R,Cat,T,R2) ~= Val.
+prune_instances([H|R],Cat,T,R2) ~ val(Val) :=
+	has_category(Cat,H,T) ~=false,
+	prune_instances(R,Cat,T,R2) ~= Val.
+
+prune_instances2([],_):t ~ val([]) := true.
+prune_instances2([H|R],Comm):t ~ val([H|R2]) :=
+	focus_constraints(H,Comm):t ~= true,
+	prune_instances2(R,Comm):t ~= R2.
+prune_instances2([H|R],Comm):t ~ val(R2) :=
+	focus_constraints(H,Comm):t ~= false,
+	prune_instances2(R,Comm):t ~= R2.
+
+has_performer(A,T) ~ val(M) :=
+	wants_action(H,A,T) ~= true,
+	has_category(performableactions_ca,A,T) ~= true,
+	myself(M).
+has_performer(A,T) ~ uniform(L) :=
+	has_category(actions_ca,A,T) ~= true,
+	findall(X,has_category(actionperformers_ca,X,T),L).
+
+has_start(A,T) ~ val(onsurface) := %NP
+	wants_action(H,A,T) ~= true, 
+	has_category(movesomethings_ca,A,T) ~= true,
+	%in kitchen
+	workingplace(Surface).
+
+has_performer(pickup_ca, actionperformers_ca). %NP
+
 /*
 Subcategory transitivity.
 */
@@ -577,14 +731,63 @@ is_subcategory2(Category1,[H|R]) :-
 	is_subcategory2(Category1,R).
 
 /*
+Object and gripper positions.
+*/	
+has_position(left_gripper,[0,0,0]).
+has_position(right_gripper,[0,0,0]).
+
+has_position(object(N)):0 ~ finite([1:(-1000,-1000,-1000)]) := 
+	nobjs:0 ~= Nu,
+	between(1,Nu,N).
+has_position(object(N)):t+1 ~ finite([1:(-1000,-1000,-1000)]) :=
+	action(human_removed(object(N))).
+has_position(object(N)):t+1 ~ finite([1:(X,Y,Z)]) :=
+	action(human_placed(object(N),[X,Y,Z])).	
+has_position(object(N)):t+1 ~ finite([1:(X,Y,Z)]) :=
+	action(pos(object(N),[X,Y,Z])).	
+	
+/*
+Effects op pickup action on object position.
+*/
+has_position(object(N)):t+1 ~ finite([1:(X2,Y2,Z2)]) :=
+	action(end_perf(PName)),
+	perf(PName,pickup,[object(N),_,_,_,Gripper]),
+	effect(PName):t ~= ingripper,
+	has_position(Gripper,[X2,Y2,Z2]).
+has_position(object(N)):t+1 ~ finite([1:(X,Y,Z)]) := 
+	action(end_perf(PName)),
+	perf(PName,pickup,[object(N),_,_,_,Gripper]),
+	effect(PName):t ~= ontable,
+	has_position(object(N)):t ~=(X,Y,Z).
+has_position(object(N)):t+1 ~ finite([1:(-1000,-1000,-1000)]) :=
+	action(end_perf(PName)),
+	perf(PName,pickup,[object(N),_,_,_,Gripper]),
+	effect(PName):t ~= fell.
+
+/*
+Effects op place action on object position.
+*/
+has_position(object(N)):t+1 ~ finite([1:(-1000,-1000,-1000)]) :=
+	action(end_perf(PName)),
+	perf(PName,place,[object(N),_,_,_,_]),
+	effect(PName):t ~= fell.
+has_position(object(N)):t+1 ~ finite([1:(X2,Y2,Z2)]) :=
+	action(end_perf(PName)),
+	perf(PName,place,[object(N),X2,Y2,Z2,Gripper]),
+	effect(PName):t ~= ontable.
+has_position(object(N)):t+1 ~ finite([1:(X2,Y2,Z2)]) :=
+	action(end_perf(PName)),
+	perf(PName,place,[object(N),_,_,_,Gripper]),
+	effect(PName):t ~= stillholding,
+	has_position(Gripper,[X2,Y2,Z2]).
+
+/*
 Position gaussian observation model.
 */
 observation(object(N)):t+1 ~ indepGaussians([ ([X],[0.005]), ([Y],[0.005]), ([Z],[0.005]) ]) :=
 	has_position(object(N)):t+1 ~= (X,Y,Z).
 
-/*
-Probabilistic effects of each action.
-*/
+
 effect(PName):t+1 ~ finite([0.9:ingripper,0.05:fell,0.05:ontable]) :=
 	%writeln(effect1),
 	action(start_perf(PName)),
@@ -640,99 +843,100 @@ effect(PName):t+1 ~ uniform([ontable,fell,stillholding]) :=
 effect(PName):t+1 ~ val(Effect) :=
 	effect(PName):t ~= Effect.
 
-/*
-Indicates whether an action effect is wanted or not in general.
-*/
-wanted_effect(PName):t ~ val(true) := %question action always has a wanted effect
+wanted_effect(PName):t ~ val(true) :=
 	action(start_perf(PName)),
 	perf(PName,Action,_),
 	member(Action,[toolq,typeq,objectq]).
+
 wanted_effect(PName):t ~ val(true) :=
 	action(end_perf(PName)),
 	perf(PName,info,[_,_,_,_,_]).
+
 wanted_effect(PName):t ~ val(true) :=
+	%writeln(weffect1),
 	action(end_perf(PName)),
 	perf(PName,pickup,[_,_,_,_,_]),
+	
 	effect(PName):t ~= ingripper.
+	%writeln(ingripper).
 wanted_effect(PName):t ~ val(false) :=
+	%writeln(weffect2),
 	action(end_perf(PName)),
 	perf(PName,pickup,[_,_,_,_,_]),
+	%writeln(weffect22),
 	effect(PName):t ~= fell.
+	%writeln(fell).
 wanted_effect(PName):t ~ val(false) :=
+	%writeln(weffect3),
 	action(end_perf(PName)),
 	perf(PName,pickup,[_,_,_,_,_]),
 	effect(PName):t ~= ontable.
+	%writeln(ontable).
+
 wanted_effect(PName):t ~ val(true) :=
+	%writeln(weffect4),
 	action(end_perf(PName)),
 	perf(PName,place,[_,_,_,_,_]),
 	effect(PName):t ~= ontable.
+	%writeln(ontable).
 wanted_effect(PName):t ~ val(false) :=
+	%writeln(weffect5),
 	action(end_perf(PName)),
 	perf(PName,place,[_,_,_,_,_]),
 	effect(PName):t ~= fell.
+	%writeln(fell).
 wanted_effect(PName):t ~ val(false) :=
+	%writeln(weffect6),
 	action(end_perf(PName)),
 	perf(PName,place,[_,_,_,_,_]),
 	effect(PName):t ~= stillholding.
+	%writeln(stillholding).
 wanted_effect(PName):t+1 ~ val(Effect) :=
 	wanted_effect(PName):t ~= Effect.
 
-/*
-Feedback that effect was wanted by user only for interpretations where predicted effect is wanted.
-*/
 observation(wanted_feedback(PName)):t+1 ~ val(B) :=
 	wanted_effect(PName):t+1 ~= B.
 
 /*
-Object and gripper positions.
-*/	
-has_position(left_gripper,[0,0,0]).
-has_position(right_gripper,[0,0,0]).
-
-has_position(object(N)):0 ~ finite([1:(-1000,-1000,-1000)]) := 
-	nobjs:0 ~= Nu,
-	between(1,Nu,N).
-has_position(object(N)):t+1 ~ finite([1:(-1000,-1000,-1000)]) :=
-	action(human_removed(object(N))).
-has_position(object(N)):t+1 ~ finite([1:(X,Y,Z)]) :=
-	action(human_placed(object(N),[X,Y,Z])).	
-has_position(object(N)):t+1 ~ finite([1:(X,Y,Z)]) :=
-	action(pos(object(N),[X,Y,Z])).	
-	
-/*
-Effects op pickup action on object position.
-*/
-has_position(object(N)):t+1 ~ finite([1:(X2,Y2,Z2)]) :=
+wanted_effect(PName):t+1 ~ val(true) :=
 	action(end_perf(PName)),
 	perf(PName,pickup,[object(N),_,_,_,Gripper]),
-	effect(PName):t ~= ingripper,
-	has_position(Gripper,[X2,Y2,Z2]).
-has_position(object(N)):t+1 ~ finite([1:(X,Y,Z)]) := 
+	graspable(object(N),Gripper):t ~=true,
+	reachable(object(N),Gripper):t ~= true.
+wanted_effect(PName):t+1 ~ val(false) :=
 	action(end_perf(PName)),
 	perf(PName,pickup,[object(N),_,_,_,Gripper]),
-	effect(PName):t ~= ontable,
-	has_position(object(N)):t ~=(X,Y,Z).
-has_position(object(N)):t+1 ~ finite([1:(-1000,-1000,-1000)]) :=
+	graspable(object(N),Gripper):t ~=false,
+	reachable(object(N),Gripper):t ~= true.
+wanted_effect(PName):t+1 ~ val(false) :=
 	action(end_perf(PName)),
 	perf(PName,pickup,[object(N),_,_,_,Gripper]),
-	effect(PName):t ~= fell.
-
-/*
-Effects op place action on object position.
-*/
-has_position(object(N)):t+1 ~ finite([1:(-1000,-1000,-1000)]) :=
+	graspable(object(N),Gripper):t ~=true,
+	reachable(object(N),Gripper):t ~= false.
+wanted_effect(PName):t+1 ~ val(false) :=
 	action(end_perf(PName)),
-	perf(PName,place,[object(N),_,_,_,_]),
-	effect(PName):t ~= fell.
-has_position(object(N)):t+1 ~ finite([1:(X2,Y2,Z2)]) :=
-	action(end_perf(PName)),
-	perf(PName,place,[object(N),X2,Y2,Z2,Gripper]),
-	effect(PName):t ~= ontable.
-has_position(object(N)):t+1 ~ finite([1:(X2,Y2,Z2)]) :=
+	perf(PName,pickup,[object(N),_,_,_,Gripper]),
+	graspable(object(N),Gripper):t ~=false,
+	reachable(object(N),Gripper):t ~= false.
+wanted_effect(PName):t+1 ~ val(true) :=
+	action(end_perf(PName)).
+wanted_effect(PName):t+1 ~ val(true) :=
 	action(end_perf(PName)),
 	perf(PName,place,[object(N),_,_,_,Gripper]),
-	effect(PName):t ~= stillholding,
-	has_position(Gripper,[X2,Y2,Z2]).
+	placeable(object(N),Gripper):t ~= true.
+wanted_effect(PName):t+1 ~ val(false) :=
+	action(end_perf(PName)),
+	perf(PName,place,[object(N),_,_,_,Gripper]),
+
+	placeable(object(N),Gripper):t ~= false.
+
+
+
+wanted_effect(PName):t+1 ~ val(B) :=
+
+	wanted_effect(PName):t ~= B.
+
+*/
 
 has_position(object(N)):t+1 ~ finite([1:(X,Y,Z)]) :=
 	has_position(object(N)):t ~= (X,Y,Z).
@@ -743,9 +947,6 @@ has_position(table):t+1 ~ finite([1:(X,Y,Z)]) :=
 has_position(table):t+1 ~ finite([1:(X,Y,Z)]) :=
 	has_position(table):t ~= (X,Y,Z).
 
-/*
-Probabilistic dimensions, since experiments are possible with uncertain object IDs.
-*/
 has_dimensions(object(N)):0 ~ val([0.1,0.1,0.1]) :=
 	nobjs:0 ~= Nu,
 	between(1,Nu,N).
@@ -759,6 +960,7 @@ has_dimensions(table):t+1 ~ finite([1:[X,Y,Z]]) :=
 	action(dim(table,[X,Y,Z])).
 has_dimensions(table):t+1 ~ finite([1:[X,Y,Z]]) :=
 	has_dimensions(table):t ~= [X,Y,Z].
+
 
 /*
 Defines when an object is near another one.
@@ -792,6 +994,7 @@ near(O1,O2):t ~ finite([1:true]) :=
 	DistZ < 0.1.
 near(O1,O2):t ~ val(false) := true.
 
+
 /*
 Definition of an object being on another one at time T.
 */
@@ -819,9 +1022,12 @@ on(O1,O2):t ~ finite([1:false]) := true.
 /*
 Definition of an object being left of another one at time T.
 */
-leftof(O,O):t ~ val(false) := 
+%TODO definition taking into account person location
+
+ leftof(O,O):t ~ val(false) := 
 	true.
-leftof(O1,O2):t ~ val(true) :=
+
+ leftof(O1,O2):t ~ val(true) :=
 	has_position(O1):t ~= (X1,Y1,Z1),
 	has_position(O2):t ~= (X2,Y2,Z2),
 	has_dimensions(O1):t ~= [Xrange1,Yrange1,Zrange1],
@@ -829,7 +1035,8 @@ leftof(O1,O2):t ~ val(true) :=
 	Y1max is Y1 + (Yrange1/2),
 	Y2min is Y2 - (Yrange2/2),
 	Y1max < Y2min. 
-leftof(O1,O2):t ~ val(false) := 
+
+ leftof(O1,O2):t ~ val(false) := 
 	true.
 
 /*
@@ -844,6 +1051,7 @@ rightof(O1,O2):t ~ finite([1:true]) :=
 	Y1min is Y1 - (Yrange1/2),
 	Y2max is Y2 + (Yrange2/2),
 	Y1min > Y2max.
+	
 rightof(O1,O2):t ~ finite([1:false]) := true.
 
 /*
@@ -873,6 +1081,8 @@ backof(O1,O2):t ~ finite([1:true]) :=
 	X2max is X2 + (Xrange2/2),
 	X1min > X2max.  
 backof(O1,O2):t ~ finite([1:false]) := true.
+
+%NP between
 
 /*
 Definition of an object being bigger than another one at time T.
@@ -916,12 +1126,14 @@ wider(O1,O2):t ~ val(true) :=
 	Yrange1 > Yrange2.
 wider(O1,O2):t ~ val(false) := true.
 
+
 /*
 Robot self-knowledge.
 */
 possible_actions(pr2_ca,[pickup_ca,pickandplace_ca]).
 generate_content_name(O,C) :-
 	atomic_concat([O,content],C).
+
 
 /*
 Add new evidence to knowledge base.
@@ -945,162 +1157,9 @@ remove_evidence([H|R]) :-
 	%writeln(removed_from_kb:H), 
 	remove_evidence(R).
 
-/*
-Processing of probability lists.
-*/
-getProbList(Cat,L2,CatProb,ProbList) :-
-	Begin = [CatProb:Cat],
-	length(L2,Length),
+%-------------------------------------------------------------------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-	(Length == 1 ->
-		ProbList = [1:Cat]
-	;
-		delete(L2, Cat, Rest),
-		length(Rest,Length2),
-		N2 is (1 - CatProb), 
-		Prob2 is N2/Length2,
-		getProbList2(Prob2,Rest,Result),
-		append(Begin,Result,ProbList)
-	).
-
-getProbList2(_,[],[]).
-getProbList2(Prob2,[H|R],[(Prob2:H)|R2]) :-
-	getProbList2(Prob2,R,R2).
-
-/*
-Extra static robot self-knowledge.
-*/
-essentialparameters(pickup_ca,[object_pickedup(pickup_ca, moveablethings_ca), has_performer(pickup_ca, actionperformers_ca), uses_gripper(pickup_ca, robotarms_ca)]).
-acts_on_object(pickup_ca, moveablethings_ca).
-pickup(pickup_ca, spatialobjects_ca).
-can_perform(pr2_ca,pickup_ca).
-maxobjs(5).
-
-performing_action(T2) ~ val(false) :=
-	timepoint(T),
-	T2 is T+1,
-	succes_performance(_,T).
-performing_action(T2) ~ val(true) :=
-	timepoint(T),
-	T2 is T+1,
-	start_performance(_,T).
-performing_action(T2) ~ val(B) :=
-	timepoint(T),
-	T2 is T+1,
-	performing_action(T) ~= B.
-performing_action(_) ~ val(false) := true.
-
-precondition_focus_prune(pickup_ca,[]):t ~ val([]) := true.
-precondition_focus_prune(pickup_ca,[H|R]):t ~ val([H|R2]) :=
-	has_category(moveablethings_ca, H):t ~= true,
-	on(H,table):t ~= true, 
-	precondition_focus_prune(pickup_ca,R):t ~= R2.
-precondition_focus_prune(pickup_ca,[content(N)|R]):t ~ val([content(N)|R2]) :=
-	content(N):t ~= true,
-	has_category(fluids_ca, content(N)):t ~= true,
-	on(object(N),table):t ~= true, 
-	precondition_focus_prune(pickup_ca,R):t ~= R2.
-precondition_focus_prune(pickup_ca,[H|R]):t ~ val(R2) :=
-	precondition_focus_prune(pickup_ca,R):t ~= R2.
-precondition_focus_prune(place_ca,[]):t ~ val([]) := true.
-precondition_focus_prune(place_ca,[H|R]):t ~ val([H|R2]) :=
-	has_category(moveablethings_ca, H):t ~= true,
-	on(H,table):t ~= false, 
-	precondition_focus_prune(place_ca,R):t ~= R2.
-precondition_focus_prune(place_ca,[H|R]):t ~ val(R2) :=
-	precondition_focus_prune(place_ca,R):t ~= R2.
-
-prune_instances([],_,_,[]) ~ val(true) := true.
-prune_instances([H|R],Cat,T,[H|R2]) ~ val(Val) :=
-	has_category(Cat,H,T) ~=true,
-	prune_instances(R,Cat,T,R2) ~= Val.
-prune_instances([H|R],Cat,T,R2) ~ val(Val) :=
-	has_category(Cat,H,T) ~=false,
-	prune_instances(R,Cat,T,R2) ~= Val.
-
-prune_instances2([],_):t ~ val([]) := true.
-prune_instances2([H|R],Comm):t ~ val([H|R2]) :=
-	focus_constraints(H,Comm):t ~= true,
-	prune_instances2(R,Comm):t ~= R2.
-prune_instances2([H|R],Comm):t ~ val(R2) :=
-	focus_constraints(H,Comm):t ~= false,
-	prune_instances2(R,Comm):t ~= R2.
-
-has_performer(A,T) ~ val(M) :=
-	wants_action(H,A,T) ~= true,
-	has_category(performableactions_ca,A,T) ~= true,
-	myself(M).
-has_performer(A,T) ~ uniform(L) :=
-	has_category(actions_ca,A,T) ~= true,
-	findall(X,has_category(actionperformers_ca,X,T),L).
-
-has_start(A,T) ~ val(onsurface) := 
-	wants_action(H,A,T) ~= true, 
-	has_category(movesomethings_ca,A,T) ~= true,
-	%in kitchen
-	workingplace(Surface).
-
-has_performer(pickup_ca, actionperformers_ca). 
-focus_constraints(_,_):t ~ val(false) :=
-	true.
-
-/*
-Extension: Categorization of commands, future work.
-*/
-
-/*
-comm_category(command(N)):0 ~ val(unknown) := command(N) ~= true.
-comm_category(command(N)):t+1 ~ val(performphysicalactioncommands_ca) :=
-	command(N) ~= true,
-	action(gives_command(H,R,command(N))),
-	action(command_content(command(N),Content)),
-	member(pickup(_),Content).
-comm_category(command(N)):t+1 ~ uniform(L) :=
-	command(N) ~= true,
-	action(gives_command(H,R,command(N))),
-	findall(X,subcategory(X,commands_ca),L).
-comm_category(command(N)):t+1 ~ val(V) :=
-	command(N) ~= true,
-	comm_category(command(N)):t ~= V.
-*/
-
-
-/*
-wants_action(human(N)):0 ~ val(false) := 	
-	human(N).
-wants_action(human(N)):t+1 ~ val(true) :=
-	human(N),
-	action(actiondemand(human(N))).
-wants_action(human(N)):t+1 ~ val(B) :=
-	human(N),
-	wants_action(human(N)):t ~= B. 
-*/
-
-/*
-wanted_action(human(N)):t+1 ~ uniform(Performable) :=
-
-	human(N),
-	action(wabegin),
-	attention_towards(human(N)):t ~= At,
-	At \= nothing,
-	performable(pickup_ca):t ~= Lpickup,
-	performable(place_ca):t ~= Lplace,
-	performable(answerquestion_ca):t ~= Q,
-	append(Lpickup,Lplace,R1),
-
-	append(R1,Q,R2),
-	pruneFocusID(R2,At):t ~= Performable,
-	writeln(Performable).
-*/
-
-%%%%%%%%%%%%%%
-%FUTURE IDEAS%
-%%%%%%%%%%%%%%
-/*
-has_craving(human(N),Craving):t+1 ~ uniform([true,false]) :=
-	action(needbegin(human(N))),	
-	subcategory(Craving,cravings_ca).
-*/
 /*
 has_category(Sub,object(N)):t ~ val(true) :=
 	%writeln(test3),
@@ -1874,8 +1933,8 @@ has_position(C, T) ~ finite([1:(X,Y,Z)]) :=
 
 */
 
-%gewilde_actie(siegfried):t+1 ~ uniform(ActieLijst) :=
-%	uitvoerbaar(pickupacties):t ~= ActieLijst.
+gewilde_actie(siegfried):t+1 ~ uniform(ActieLijst) :=
+	uitvoerbaar(pickupacties):t ~= ActieLijst.
 
 
 /*
@@ -1904,83 +1963,3 @@ has_category(Cat,object(N)):0 ~ finite([1:false]) :=
 	category(Cat),
 	object(N):t ~= true.
 */
-
-/*
-wanted_effect(PName):t+1 ~ val(true) :=
-	action(end_perf(PName)),
-	perf(PName,pickup,[object(N),_,_,_,Gripper]),
-	graspable(object(N),Gripper):t ~=true,
-	reachable(object(N),Gripper):t ~= true.
-wanted_effect(PName):t+1 ~ val(false) :=
-	action(end_perf(PName)),
-	perf(PName,pickup,[object(N),_,_,_,Gripper]),
-	graspable(object(N),Gripper):t ~=false,
-	reachable(object(N),Gripper):t ~= true.
-wanted_effect(PName):t+1 ~ val(false) :=
-	action(end_perf(PName)),
-	perf(PName,pickup,[object(N),_,_,_,Gripper]),
-	graspable(object(N),Gripper):t ~=true,
-	reachable(object(N),Gripper):t ~= false.
-wanted_effect(PName):t+1 ~ val(false) :=
-	action(end_perf(PName)),
-	perf(PName,pickup,[object(N),_,_,_,Gripper]),
-	graspable(object(N),Gripper):t ~=false,
-	reachable(object(N),Gripper):t ~= false.
-wanted_effect(PName):t+1 ~ val(true) :=
-	action(end_perf(PName)).
-wanted_effect(PName):t+1 ~ val(true) :=
-	action(end_perf(PName)),
-	perf(PName,place,[object(N),_,_,_,Gripper]),
-	placeable(object(N),Gripper):t ~= true.
-wanted_effect(PName):t+1 ~ val(false) :=
-	action(end_perf(PName)),
-	perf(PName,place,[object(N),_,_,_,Gripper]),
-
-	placeable(object(N),Gripper):t ~= false.
-
-
-
-
-wanted_effect(PName):t+1 ~ val(B) :=
-
-	wanted_effect(PName):t ~= B.
-
-*/
-
-%update met observaties
-
-/*
-observation(negfeedback(human(N))):t+1 ~ val(Neg) :=
-	wanted_action(human(N)):t+1 ~= WA,
-	writeln(WA),
-	writeln(Neg),
-	WA \= Neg,
-	writeln(feedbacktest).
-*/
-
-/*
-graspable(object(N),right_gripper):0 ~ finite([0.9:true, 0.1:false]) :=
-	nobjs:0 ~= Nu,
-	between(1,Nu,N). 
-graspable(object(N),left_gripper):0 ~ finite([0.9:true, 0.1:false]) :=
-	nobjs:0 ~= Nu,
-	between(1,Nu,N).
-graspable(object(N),GR):t+1 ~ val(B) :=
-	graspable(object(N),GR):t ~= B.
-
-placeable(object(N),right_gripper):0 ~ finite([0.9:true, 0.1:false]) :=
-	nobjs:0 ~= Nu,
-	between(1,Nu,N). 
-placeable(object(N),left_gripper):0 ~ finite([0.9:true, 0.1:false]) :=
-	nobjs:0 ~= Nu,
-	between(1,Nu,N). 
-placeable(object(N),Gripper):t+1 ~ val(B) :=
-	placeable(object(N),Gripper):t ~= B.
-*/
-
-%NP between
-%NP cat optimal
-%NP number of objects observation model with higher chance of seeing number closer to real number
-%,0.1:cleanup need
-%TODO definition leftof, etc... taking into account person location
-%TODO extend care model with more state knowledge, extend wa with list!

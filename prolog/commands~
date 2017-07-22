@@ -1,0 +1,41 @@
+%%TOOLS ANTWOORDEN
+[current(wanted_action(human(1)))~=(AT,F,left_gripper)]
+ 
+[current(wants_tool_used(human(1)))~=left_gripper]
+[current(wants_tool_used(human(1)))~=right_gripper]
+[current(wants_tool_used(human(1)))~=robotbrain]
+
+(pickup, object(ID), Gripper   )
+(place , object(ID), Gripper   )
+(info  , object(ID), robotbrain)
+
+%%OBJ ANTWOORDEN
+[has_colour(object(ID),red),current(wanted_action(human(1)))~=(AT,object(ID),T)]
+[has_colour(object(ID),midnight_blue),current(wanted_action(human(1)))~=(AT,object(ID),T)]
+
+"can with right gripper"
+[current(wanted_action(human(1)))~=(AT,F,right_gripper),current(has_category(can,F))~=true]
+"can with left gripper"
+[current(wanted_action(human(1)))~=(AT,F,left_gripper),current(has_category(can,F))~=true]
+
+[has_colour(object(ID),red),current(has_category(can,object(ID)))~=true,current(wanted_action(human(1)))~=(AT,object(ID),T)]
+
+[has_colour(object(ID),midnight_blue),current(has_category(can,object(ID)))~=true]
+
+[has_colour(object(ID),midnight_blue)]
+[has_colour(object(ID),red)]
+
+
+"left object"
+[current(wanted_action(human(1)))~=(AT,F,Gr),current(leftOf(F,O))~=true]
+
+"cup"
+[current(has_category(cup,F))~=true]
+
+"can"
+[current(has_category(can,F))~=true]
+
+!!!niet zelfde als
+[current(wants_object(can,human(1)))~=true] %zowel human info als connectie met wa
+
+[current(care(human(1),object))~=nocare]

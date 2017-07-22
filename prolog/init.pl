@@ -3,7 +3,9 @@
 :- use_module('../dcpf.pl').
 :- use_module('../random/sampling.pl').
 :- use_module('knowledge_base.pl').
+:- use_module('command_processing.pl').
 :- use_module('color_processing.pl').
+:- use_module('perception_module.pl').
 :- use_module('knowledge_processing.pl').
 :- use_module('action_decision.pl').
 :- use_module(library(lists)).
@@ -12,29 +14,6 @@
 
 lifted(false).
 raoblackwellisation(false).
-
-/*
-Object recognition section, processing of new perception iteration data. Involves probabilistic object recognition and processing of nem number of objects on table.
-*/
-nobjsObservationInit(NO,N) :-
-	nl,
-	writeln('New number of objects observation.'),
-	nobjs_current_query(N),
-	step_particle([],[observation(nobjsinit)~=NO],N),
-	nobjs_current_query(N),
-	seen_query(N),
-	seenUpdate(NO,N),
-	seen_query(N).
-
-seenUpdate(0,_).
-seenUpdate(Number,N) :-
-	step_particle([action(seen(object(Number)))],[],N),
-	Number2 is Number-1,
-	seenUpdate(Number2,N).
-
-seen_query(N) :-
-	eval_query_particle2((NO,B),current(seen(object(NO)))~=B, N, R2),
-	writeln(R2).
 
 objectsObservationIterationParticles(NumberRecognized,Info,N) :-
 	nl,writeln('Previous number objects knowledge:'),
@@ -48,18 +27,14 @@ objectsObservationIterationParticles(NumberRecognized,Info,N) :-
 	nl,write('Processing new scan information for each particle: '),writeln(Info),
 	
 	processTypeInfo(Info,Info2),
-	writeln(test1111:Info2),
 	step_particle4(Info2,NumberRecognized,N),
-	writeln(test55555555),	
-	printp(1),
-	dcpf:resampling(N),
-	writeln(test6666),	
-	printp(1).
+	dcpf:resampling(N)
+	.
 	
+
 processTypeInfo([],[]).
 processTypeInfo([H2|R2],[H3|R3]) :-
 	H2 = [Xmid,Ymid,Zmid,Xr,Yr,Zr,Red,G,B,Types],
-	writeln(H2),
 	%colourProbability((Red,G,B),P),%NP
 	%writeln(colors_recognized:P),
 	modelnumbersToCats(Types,Types2),
@@ -72,9 +47,11 @@ objectsObservationIteration2(PreviousOnTable,NumberRecognized,Info,I,ObsT,[],[])
 	length(PreviousOnTable,Le1),
 	Le1 == NumberRecognized,
 	%writeln('Same amount of objects on table.'),
+
 	findall(ObjectID,member((object(ObjectID)),PreviousOnTable),PreviousOnTableIDs),
 	%write('object ids on table previous: '), writeln(Pre),
 	calculateDistances(PreviousOnTableIDs,Info,Matrix,I),
+
 	findall((Sub,D),(permutation(PreviousOnTableIDs,Pre2),length(Sub,NumberRecognized),member(Nu,Pre2),member(Nu,Sub),sublist(Sub,Pre2),distanceMatrix(Sub,Matrix,D)),L),
 	remove_duplicates(L, Lpruned),
 	findall(Score,member((SS,Score),Lpruned),ScoreL),
@@ -86,9 +63,11 @@ objectsObservationIteration2(NO1,NO2,Info,I,Obs,Ev,Actions) :-
 	length(NO1,Le1),
 	Le1>NO2,
 	%writeln('Object(s) removed from table'),
+
 	findall(ObjectID,member((object(ObjectID)),NO1),Pre),
 	%write('object ids on table previous: '), writeln(Pre),
 	calculateDistances(Pre,Info,Matrix,I),
+
 	findall((Sub,D),(permutation(Pre,Pre2),length(Sub,NO2),member(Nu,Pre2),member(Nu,Sub),sublist(Sub,Pre2),distanceMatrix(Sub,Matrix,D)),L),
 	remove_duplicates(L, Lpruned),
 	findall(Score,member((SS,Score),Lpruned),ScoreL),
@@ -96,19 +75,24 @@ objectsObservationIteration2(NO1,NO2,Info,I,Obs,Ev,Actions) :-
 	member((Sub1,Min),Lpruned),
 	objectsPositionUpdate(Sub1,Info,I,Obs),
 	getRemoved(Pre,Sub1,Rem),
-	objectsRemoved(Rem,I,Ev,Actions).%,!.
+	objectsRemoved(Rem,I,Ev,Actions),!.
 
+%TO CHECK test ok
 objectsObservationIteration2(PreviousOnTable,NumberRecognized,Info,I,ObsT,[],Actions) :-
 	length(PreviousOnTable,Le1),
 	Le1<NumberRecognized,
 	Diff is NumberRecognized-Le1,
 	%writeln('Object(s) extra on table'),
+	
 	eraseall(tempparticle),
 	findall(H,(distributionalclause:proof_query_backward(I,tempparticle,(current(seen(object(H))) ~= true))),ListS),
+	%writeln(ListS),
 	length(ListS,LengthS),
 	LengthS < NumberRecognized,
 	StartI is LengthS+1,
 	findall(Num,between(StartI,NumberRecognized,Num),Lii),
+	
+
 	findall(ObjectID,member((object(ObjectID)),PreviousOnTable),Pre),
 	length(Pre,PreLe),
 	calculateDistances(Pre,Info,Matrix,I),
@@ -129,7 +113,9 @@ objectsObservationIteration2(PreviousOnTable,NumberRecognized,Info,I,ObsT,[],Act
 	findall(Score2,member((SS2,Score2),Lpruned),ScoreL2),
 	min_list(ScoreL2,Min2),
 	member((Sub2,Min2),Lpruned),
-	objectsPlacedActions(Lii,InfoPruned,Actions,I).
+	objectsPlacedActions(Lii,InfoPruned,Actions,I),!.
+	%writeln(Actions).
+
 
 objectsObservationIteration2(PreviousOnTable,NumberRecognized,Info,I,ObsT,[],Actions) :-
 	length(PreviousOnTable,Le1),
@@ -158,7 +144,8 @@ objectsObservationIteration2(PreviousOnTable,NumberRecognized,Info,I,ObsT,[],Act
 	findall(Score2,member((SS2,Score2),Lpruned),ScoreL2),
 	min_list(ScoreL2,Min2),
 	member((Sub2,Min2),Lpruned),
-	objectsPlacedActions(Sub2,InfoPruned,Actions,I).%!.
+	objectsPlacedActions(Sub2,InfoPruned,Actions,I),!.
+	%writeln(Actions).
 	
 objectsPlacedActions([],[],[],I).
 objectsPlacedActions([H|R],[H2|R2],HRRR,I) :-
@@ -328,9 +315,8 @@ query_effect(Name,N) :-
 	write('performance '),write(Name),write(' has wanted effect '),writeln(R).
 
 needBeginObservation(H,N) :-
-	step_particle([action(cravingbegin(H))],[],N),
-	craving_current_query(H,N),
 	step_particle([action(needbegin(H))],[],N),
+	craving_current_query(H,N),
 	need_current_query(H,N).
 
 colorObservationInit(ID,[R,G,B],N) :-
@@ -391,14 +377,14 @@ success_performance(Name,N) :-
 	robot_current_query(N).
 
 /*
-Feedback section.
+Feedback sectie.
 */
 positive_feedback(PName,N) :-
 	perf(PName,Cat,Params),
 	Params = [O,_,_,_,Tool],
 	nl,writeln('Human indicates this was wanted performance.'),
 	step_particle([action(feedback(PName,good))],[],N),  
-	step_particle([],[observation(posfeedback(human(1)))~=(Cat,O,Tool)],N).%NP human
+	step_particle([],[observation(posfeedback(human(1)))~=(Cat,O,Tool)],N),%NP human
 	/*
 	list_to_tuple([current(wanted_action(human(1)))~=(Cat,O,Tool)],Q2),
 	get_variables(Q,L2),
@@ -407,8 +393,8 @@ positive_feedback(PName,N) :-
 	list_to_tuple(L4,L5),
 	step_particle3(L5,Q2,N),
 	*/	
-	%current_wa_query(human(1),N),
-	%performance_current_query(N).
+	current_wa_query(human(1),N),
+	performance_current_query(N).
 
 negative_feedback(N,CA) :- 
 	performance_current_query(N),
@@ -459,7 +445,7 @@ typeObservationIt(ObjLoc,Tag,N) :-
 	step_particle([action(obsProb(object(ID),L))],[],N),
 	obj_current_query(object(ID),N),nl.
 
-%NP zet in knowledge_processing
+%TODO zet in knowledge_processing
 
 distances(_,0,_,[]).
 distances(ObjLoc,NO,N,[H|R]) :-
@@ -516,26 +502,48 @@ initdcpf(N) :-
 	init_particle(N),
 	writeln('Dcpf ready.').
 
-
-/*
-Object observation section
-*/
-typeObservationInit(Obj,Cats,N) :-
-	modelnumbersToCats(Cats,Cats2),
-	probabilities_sum(Cats2,Sum),
-	relative_probs(Cats2,Sum,RelProbs),
+nobjsObservationInit(NO,N) :-
 	nl,
-	write('New first type observation for obj '),write(Obj),write('.'),nl,
-	step_particle([action(segm(object(Obj),RelProbs))],[],N), 
-	obj_category_current_query(object(Obj),N).
-	
+	writeln('New number of objects observation.'),
+	nobjs_current_query(N),
+	step_particle([],[observation(nobjsinit)~=NO],N),
+	nobjs_current_query(N),
+	seen_query(N),
+	seenUpdate(NO,N),
+	seen_query(N).
+
+seenUpdate(0,_).
+seenUpdate(Number,N) :-
+	step_particle([action(seen(object(Number)))],[],N),
+	Number2 is Number-1,
+	seenUpdate(Number2,N).
+
+seen_query(N) :-
+	eval_query_particle2((NO,B),current(seen(object(NO)))~=B, N, R2),
+	writeln(R2).
+
 modelnumbersToCats([],[]).
 modelnumbersToCats([(Score:Number)|R],[(Score2:Category)|R2]) :-
 	model(Category,Number,Descr),
 	numbermodels(Category,N2),
 	Score2 is Score/N2,
-	modelnumbersToCats(R,R2).	
+	modelnumbersToCats(R,R2).
 
+typeObservationInit(Obj,Cats,N) :-
+	modelnumbersToCats(Cats,Cats2),
+	probabilities_sum(Cats2,Sum),
+	relative_probs(Cats2,Sum,RelProbs),
+	%writeln(RelProbs),
+	nl,
+	write('New first type observation for obj '),write(Obj),write('.'),nl,
+	step_particle([action(segm(object(Obj),RelProbs))],[],N), 
+	%findall(X,member((_:X),Cats2),L),
+	%remove_duplicates(L,L2),
+	%step_particle([action(obsProb(object(Obj),L2))],[],N),
+	obj_category_current_query(object(Obj),N).
+	%R = action(obsProb(object(Obj),L2)),
+	%asserta(R).
+	
 locationObservationIt(Obj,ObjLoc,N) :-
 	nl,
 	write('New place observation for obj '),write(Obj),write('.'),nl,
@@ -576,8 +584,7 @@ commandObservation(Human,Q,N) :-
 	writeln(Q),
 	list_to_tuple(Q,Q2),
 	get_variables(Q,L2),
-	writeln(L2),
-	L2 == [],
+	L2 == [[]],
 	writeln('ok'),
 	step_particle3([],Q2,N),
 	nl,	
@@ -793,15 +800,33 @@ ask_commandoptions(N,[performphysicalactioncommands_ca|R],ChosenN) :-
 	write('Perform action. '),write('(type '), write(N),writeln('.)'),
 	N2 is N+1,
 	ask_commandoptions(N2,R,ChosenN).
+%TODO give_evidence alternatief
+
 ask_option(Options) :-
+	%writeln(Options),
 	give_options(1,Options).
+	
+	/*
+	read(N),
+	nth1(N,Info,InfoN),
+	write('You have chosen the '),
+	insert_colour(InfoN),
+	insert_categoryname(Cat),
+	writeln('.'),
+	nth1(N,Options,Chosen).
+	*/
+
 ask_focus_diff(pickup_ca,FChoice) :-
 	write('Which of these do you want to pickup? '), writeln(FChoice).
+	%TODO duidelijke eigenschappen voor persoon
+
 has_colour([H|R],Colour) :-
+	%writeln(H),
 	can_be(H,colour_ca),
 	Colour=H.
 has_colour([H|R],Colour) :-
 	has_colour(R,Colour).
+
 insert_colour(InfoN) :-
 	(has_colour(InfoN,Colour) ->		
 		write(Colour),
@@ -809,9 +834,11 @@ insert_colour(InfoN) :-
 	;
 		write('')
 	).
+
 insert_categoryname(Cat) :-
 	naturalname(Cat,Name),
 	write(Name),write(' ').
+
 insert_actionmention(ACat) :-
 	naturalname(ACat,AName),
 	write(AName),write(' ').
@@ -1106,11 +1133,11 @@ step_particle4(Info,NumberRecognized,N) :-
 		findall(O,(distributionalclause:proof_query_backward(I,tempparticle,(current(on(O,table))~=true))),PreviousOnTable),
 		
 		%nl,
-		writeln(I),
+		%writeln(I),
 		%writeln(List),
-		writeln(pre_step:PreviousOnTable),
+		%writeln(pre_step:PreviousOnTable),
 		objectsObservationIteration2(PreviousOnTable,NumberRecognized,Info,I,ObsT,PosEvidence,Actions),
-		writeln(end:PosEvidence),
+		%writeln(PosEvidence),
 		assert_list(I,PosEvidence),
 		assert_list(I,ObsT), 
 		assert_list(I,Actions),

@@ -1,0 +1,26 @@
+<package>
+  <description brief="pickplace">
+
+     pickplace
+
+  </description>
+  <author>Siegfried</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/pickplace</url>
+  <depend package="actionlib"/>
+  <depend package="object_manipulation_msgs"/>
+  <depend package="tabletop_object_detector"/>
+  <depend package="tabletop_collision_map_processing"/>
+  <depend package="gazebo_worlds"/>
+  <depend package="pr2_gazebo"/>
+  <depend package="pr2_description"/>
+  <depend package="pr2_controller_configuration_gazebo"/>
+
+	<export>
+    <gazebo gazebo_media_path="${prefix}"/>
+  </export>
+
+</package>
+
+

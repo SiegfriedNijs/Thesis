@@ -3,9 +3,6 @@
 :- use_module('utilities.pl').
 :- use_module('knowledge_processing.pl').
 
-/*
-List of colours and their standard RGB point, distinction between basic/common and extended/uncommon colour names.
-*/
 colour(extended,maroon,(128,0,0)).
 colour(extended,dark_red,(139,0,0)).
 colour(basic,brown,(165,42,42)).
@@ -149,27 +146,18 @@ colour(extended,olive,(128,128,0)).
 numberExtended(3).
 numberBasic(2).
 
-/*
-Calculates closest basic colours to a given RGB point.
-*/
 closestBasicColour([R,G,B],Col) :-
 	findall((D2-C),(colour(basic,C,(X1,Y1,Z1)),distance((X1,Y1,Z1),(R,G,B),D),D2 is 360-D),Pr),
 	keysort(Pr,Sorted),
 	reverse(Sorted,S2),
 	nth1(1,S2,(Dmax-Col)).
 
-/*
-Calculates closest extended colours to a given RGB point.
-*/
 closestExtColour([R,G,B],Col) :-
 	findall((D2-C),(colour(extended,C,(X1,Y1,Z1)),distance((X1,Y1,Z1),(R,G,B),D),D2 is 360-D),Pr),
 	keysort(Pr,Sorted),
 	reverse(Sorted,S2),
 	nth1(1,S2,(Dmax-Col)).
 
-/*
-Calculates probability of RGB point being associated with a colout, based on distance in RGB space.
-*/
 colourProbability((X2,Y2,Z2),Pend) :-
 	findall((D2-C),(colour(basic,C,(X1,Y1,Z1)),distance((X1,Y1,Z1),(X2,Y2,Z2),D),D2 is 360-D),Pr),
 	keysort(Pr,Sorted),
